@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monad Whiteboard NFT</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Add Web3.js -->
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.5.2/dist/web3.min.js"></script>
+    <!-- Add Axios for HTTP requests -->
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <!-- Add Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .notification-container {
+            position: fixed;
+            top: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 9999;
+            min-width: 320px;
+            max-width: 90vw;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .notification {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: linear-gradient(90deg, #7b2ff2 0%, #f357a8 100%);
+            color: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 24px rgba(123,47,242,0.15);
+            padding: 16px 28px;
+            margin-bottom: 12px;
+            font-size: 1.1rem;
+            font-weight: 500;
+            min-width: 280px;
+            max-width: 100%;
+            animation: fadeIn 0.3s;
+        }
+        .notification.success {
+            background: linear-gradient(90deg, #e302f7 0%, #b90c9f 100%);
+        }
+        .notification.error {
+            background: linear-gradient(90deg, #a00fe3 0%, #aa0ca5 100%);
+        }
+        .notification.warning {
+            background: linear-gradient(90deg, #d30de1 0%, #ca64df 100%);
+            color: #fbf9fb;
+        }
+        .notification .icon {
+            font-size: 1.5em;
+            display: flex;
+            align-items: center;
+        }
+        .wallet-info-card {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            background: linear-gradient(90deg, #7b2ff2 0%, #f357a8 100%);
+            color: #fff;
+            border-radius: 16px;
+            box-shadow: 0 2px 16px rgba(123,47,242,0.10);
+            padding: 14px 28px;
+            margin-top: 10px;
+            font-size: 1.1rem;
+            font-weight: 500;
+            border: 2px solid #fff;
+            min-width: 320px;
+            max-width: 100vw;
+            transition: box-shadow 0.2s;
+        }
+        .wallet-info-card .wallet-address {
+            font-family: 'Fira Mono', monospace;
+            background: rgba(255,255,255,0.12);
+            padding: 4px 10px;
+            border-radius: 8px;
+            font-size: 1em;
+        }
+        .wallet-info-card .network-name {
+            background: rgba(255,255,255,0.12);
+            padding: 4px 10px;
+            border-radius: 8px;
+            font-size: 1em;
+        }
+        .wallet-info-card .disconnect-btn {
+            background: #fff;
+            color: #7b2ff2;
+            border: none;
+            border-radius: 8px;
+            padding: 6px 18px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-left: 10px;
+            transition: background 0.2s, color 0.2s;
+        }
+        .wallet-info-card .disconnect-btn:hover {
+            background: #f357a8;
+            color: #fff;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+    <div class="notification-container" id="notificationContainer"></div>
+    <div class="app-container">
+        <!-- Header with wallet connection -->
+        <header class="app-header">
+            <div class="logo">
+                <img src="monad-logo.png" alt="Monad Logo" class="logo-img">
+                <h1>Monad Whiteboard NFT</h1>
+            </div>
+            <div class="wallet-section">
+                <button id="connectWallet" class="connect-wallet-btn">
+                    <i class="fas fa-wallet"></i>
+                    <span>Connect Wallet</span>
+                </button>
+                <div id="walletInfo" class="wallet-info-card" style="display: none;">
+                    <span class="wallet-address" id="walletAddress"></span>
+                    <span class="network-name" id="networkName"></span>
+                    <button class="disconnect-btn" id="disconnectWallet" title="Disconnect Wallet"><i class="fas fa-sign-out-alt"></i> Disconnect</button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main content area -->
+        <main class="main-content">
+            <!-- Tools sidebar -->
+            <div class="tools-sidebar">
+                <div class="tool-group">
+                    <h3>Drawing Tools</h3>
+                    <button id="pencil" class="tool active" title="Pencil">
+                        <i class="fas fa-pencil-alt"></i>
+                    </button>
+                    <button id="brush" class="tool" title="Brush">
+                        <i class="fas fa-paint-brush"></i>
+                    </button>
+                    <button id="spray" class="tool" title="Spray">
+                        <i class="fas fa-spray-can"></i>
+                    </button>
+                    <button id="eraser" class="tool" title="Eraser">
+                        <i class="fas fa-eraser"></i>
+                    </button>
+                </div>
+                <div class="tool-group">
+                    <h3>Effects</h3>
+                    <button id="blur" class="tool" title="Blur">
+                        <i class="fas fa-blur"></i>
+                    </button>
+                    <button id="smudge" class="tool" title="Smudge">
+                        <i class="fas fa-hand-paper"></i>
+                    </button>
+                    <button id="dotted" class="tool" title="Dotted">
+                        <i class="fas fa-circle"></i>
+                    </button>
+                </div>
+                <div class="tool-group">
+                    <h3>Image Tools</h3>
+                    <button id="crop" class="tool" title="Crop">
+                        <i class="fas fa-crop"></i>
+                    </button>
+                    <button id="resize" class="tool" title="Resize">
+                        <i class="fas fa-expand-arrows-alt"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Canvas area -->
+            <div class="canvas-container">
+                <canvas id="whiteboard"></canvas>
+                <div class="canvas-overlay">
+                    <button id="mintNFT" class="mint-btn" disabled>
+                        <i class="fas fa-magic"></i>
+                        <span>Mint as NFT</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Controls sidebar -->
+            <div class="controls-sidebar">
+                <div class="control-group">
+                    <h3>Color & Size</h3>
+                    <div class="color-picker-container">
+                        <label>Color:</label>
+                        <input type="color" id="colorPicker" value="#000000">
+                    </div>
+                    <div class="size-slider-container">
+                        <label>Size:</label>
+                        <input type="range" id="sizeSlider" min="1" max="50" value="5">
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <h3>Media</h3>
+                    <button id="uploadImage" class="control-btn">
+                        <i class="fas fa-image"></i>
+                        <span>Upload Image</span>
+                    </button>
+                    <button id="uploadGif" class="control-btn">
+                        <i class="fas fa-film"></i>
+                        <span>Upload GIF</span>
+                    </button>
+                    <button id="emojiPicker" class="control-btn">
+                        <i class="far fa-smile"></i>
+                        <span>Add Emoji</span>
+                    </button>
+                </div>
+
+                <div class="control-group">
+                    <h3>Actions</h3>
+                    <button id="savePNG" class="control-btn">
+                        <i class="fas fa-download"></i>
+                        <span>Save as PNG</span>
+                    </button>
+                    <button id="saveJPG" class="control-btn">
+                        <i class="fas fa-download"></i>
+                        <span>Save as JPG</span>
+                    </button>
+                    <button id="clear" class="control-btn">
+                        <i class="fas fa-trash"></i>
+                        <span>Clear Canvas</span>
+                    </button>
+                    <div class="undo-redo-buttons">
+                        <button id="undo" class="control-btn">
+                            <i class="fas fa-undo"></i>
+                        </button>
+                        <button id="redo" class="control-btn">
+                            <i class="fas fa-redo"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Hidden inputs -->
+        <input type="file" id="imageInput" accept="image/*" style="display: none;">
+        <input type="file" id="gifInput" accept="image/gif" style="display: none;">
+
+        <!-- Emoji picker container -->
+        <div id="emojiContainer" class="emoji-container">
+            <div class="emoji-picker">
+                <div class="emoji-grid"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+    <script src="nftMinter.js"></script>
+    <script>
+        // Initialize Whiteboard immediately
+        const whiteboard = new Whiteboard();
+
+        // Monad Testnet details
+        const MONAD_CHAIN_ID = '0x279f'; // 10143 in hex
+        const MONAD_CHAIN_ID_DEC = 10143;
+        const MONAD_PARAMS = {
+            chainId: MONAD_CHAIN_ID,
+            chainName: 'Monad Testnet',
+            rpcUrls: ['https://testnet-rpc.monad.xyz/'],
+            nativeCurrency: {
+                name: 'Monad',
+                symbol: 'MON',
+                decimals: 18
+            },
+            blockExplorerUrls: ['https://testnet.monadexplorer.com/']
+        };
+
+        // Show notification (reuse from script.js if available)
+        function showNotification(message, type = 'success', duration = 4000) {
+            const container = document.getElementById('notificationContainer');
+            if (!container) return;
+            let iconClass = 'fa-circle-info';
+            if (type === 'success') iconClass = 'fa-circle-check';
+            else if (type === 'error') iconClass = 'fa-circle-xmark';
+            else if (type === 'warning') iconClass = 'fa-triangle-exclamation';
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.innerHTML = `
+                <span class="icon"><i class="fa-solid ${iconClass}"></i></span>
+                <span>${message}</span>
+            `;
+            container.appendChild(notification);
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                notification.style.transform = 'translateY(-20px)';
+                setTimeout(() => {
+                    notification.remove();
+                }, 300);
+            }, duration);
+        }
+
+        // Initialize Web3
+        async function initWeb3() {
+            const connectWalletBtn = document.getElementById('connectWallet');
+            const walletInfo = document.getElementById('walletInfo');
+            const walletAddress = document.getElementById('walletAddress');
+            const networkName = document.getElementById('networkName');
+            const mintBtn = document.getElementById('mintNFT');
+            const disconnectBtn = document.getElementById('disconnectWallet');
+
+            // Hide wallet info and show connect by default
+            walletInfo.style.display = 'none';
+            connectWalletBtn.style.display = 'flex';
+            if (mintBtn) mintBtn.disabled = true;
+
+            // Disconnect logic
+            disconnectBtn.onclick = () => {
+                walletInfo.style.display = 'none';
+                connectWalletBtn.style.display = 'flex';
+                if (mintBtn) mintBtn.disabled = true;
+                networkName.textContent = '';
+                walletAddress.textContent = '';
+                showNotification('Wallet disconnected.', 'success');
+            };
+
+            connectWalletBtn.addEventListener('click', async () => {
+                if (window.ethereum) {
+                    try {
+                        // Request account access
+                        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                        window.web3 = new Web3(window.ethereum);
+                        // Check network
+                        let chainId = await window.web3.eth.getChainId();
+                        if (chainId !== MONAD_CHAIN_ID_DEC) {
+                            // Try to switch
+                            try {
+                                await window.ethereum.request({
+                                    method: 'wallet_switchEthereumChain',
+                                    params: [{ chainId: MONAD_CHAIN_ID }]
+                                });
+                                chainId = MONAD_CHAIN_ID_DEC;
+                                showNotification('Switched to Monad Testnet!', 'success');
+                            } catch (switchError) {
+                                // If not added, try to add
+                                if (switchError.code === 4902 || (switchError.data && switchError.data.originalError && switchError.data.originalError.code === 4902)) {
+                                    try {
+                                        await window.ethereum.request({
+                                            method: 'wallet_addEthereumChain',
+                                            params: [MONAD_PARAMS]
+                                        });
+                                        showNotification('Monad Testnet added! Please connect again.', 'success');
+                                        return;
+                                    } catch (addError) {
+                                        showNotification('Failed to add Monad Testnet.', 'error');
+                                        return;
+                                    }
+                                } else {
+                                    showNotification('Please switch to Monad Testnet in your wallet.', 'warning');
+                                    return;
+                                }
+                            }
+                        }
+                        // Update UI
+                        connectWalletBtn.style.display = 'none';
+                        walletInfo.style.display = 'flex';
+                        walletAddress.textContent = `${accounts[0].slice(0, 6)}...${accounts[0].slice(-4)}`;
+                        networkName.textContent = 'Monad Testnet';
+                        if (mintBtn) mintBtn.disabled = false;
+                        // Use the deployed contract address
+                        const contractAddress = '0xa3c34e3a52b9566d7F6cB63792402E2379Cff46a';
+                        // Connect whiteboard to NFT minter
+                        connectToNFTMinter(whiteboard, contractAddress, window.web3);
+                        showNotification('Wallet connected to Monad Testnet!', 'success');
+                    } catch (error) {
+                        console.error('Error initializing Web3:', error);
+                        showNotification('Failed to connect wallet: ' + error.message, 'error');
+                    }
+                } else {
+                    showNotification('Please install MetaMask to use this feature!', 'error');
+                }
+            });
+
+            // Handle network changes
+            if (window.ethereum) {
+                window.ethereum.on('chainChanged', async (chainId) => {
+                    if (parseInt(chainId, 16) !== MONAD_CHAIN_ID_DEC) {
+                        showNotification('Please switch to Monad Testnet!', 'warning');
+                        if (mintBtn) mintBtn.disabled = true;
+                        networkName.textContent = 'Wrong Network';
+                    } else {
+                        showNotification('Switched to Monad Testnet!', 'success');
+                        if (mintBtn) mintBtn.disabled = false;
+                        networkName.textContent = 'Monad Testnet';
+                    }
+                });
+                // Handle account changes
+                window.ethereum.on('accountsChanged', async (accounts) => {
+                    if (accounts.length > 0) {
+                        walletAddress.textContent = `${accounts[0].slice(0, 6)}...${accounts[0].slice(-4)}`;
+                    } else {
+                        // User disconnected wallet
+                        walletInfo.style.display = 'none';
+                        connectWalletBtn.style.display = 'flex';
+                        if (mintBtn) mintBtn.disabled = true;
+                        networkName.textContent = '';
+                        walletAddress.textContent = '';
+                    }
+                });
+            }
+        }
+        // Initialize Web3 when the page loads
+        window.addEventListener('load', initWeb3);
+    </script>
+</body>
+</html> 
