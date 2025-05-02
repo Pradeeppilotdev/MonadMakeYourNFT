@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="monad-logo.png">
     <title>Monad Whiteboard NFT</title>
     <link rel="stylesheet" href="styles.css">
     <!-- Add Web3.js -->
@@ -104,6 +105,89 @@
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(-20px); }
             to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* NFT Section Styles */
+        .minted-nfts-section {
+            padding: 2rem;
+            background: rgba(123,47,242,0.05);
+            margin-top: 2rem;
+            border-radius: 16px;
+        }
+
+        .section-title {
+            color: #7b2ff2;
+            font-size: 1.8rem;
+            margin-bottom: 1.5rem;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .nft-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 1.5rem;
+            padding: 1rem;
+        }
+
+        .nft-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(123,47,242,0.1);
+            overflow: hidden;
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+        }
+
+        .nft-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 30px rgba(123,47,242,0.2);
+        }
+
+        .nft-image {
+            width: 100%;
+            height: 250px;
+            object-fit: cover;
+            border-bottom: 2px solid rgba(123,47,242,0.1);
+        }
+
+        .nft-info {
+            padding: 1rem;
+        }
+
+        .nft-title {
+            color: #7b2ff2;
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .nft-details {
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .loading-spinner {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+            padding: 2rem;
+            color: #7b2ff2;
+            font-size: 1.2rem;
+            grid-column: 1 / -1;
+        }
+
+        .loading-spinner i {
+            font-size: 2rem;
+        }
+
+        .no-nfts-message {
+            text-align: center;
+            padding: 2rem;
+            color: #666;
+            font-size: 1.1rem;
+            grid-column: 1 / -1;
         }
     </style>
 </head>
@@ -237,6 +321,9 @@
                 </div>
             </div>
         </main>
+
+        <!-- Minted NFTs Section -->
+        <!-- (Removed as per user request) -->
 
         <!-- Hidden inputs -->
         <input type="file" id="imageInput" accept="image/*" style="display: none;">

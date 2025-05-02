@@ -43,6 +43,7 @@ class Whiteboard {
         this.lastClickTime = 0;
         this.doubleClickThreshold = 300; // milliseconds
         this.selectedImage = null;
+        this.baseDrawingImage = null; // Store the base drawing
 
         // Initialize the canvas and tools
         this.setupCanvas();
@@ -442,6 +443,19 @@ class Whiteboard {
 
     addEmoji(emoji) {
         console.log('Adding emoji:', emoji);
+        // Store the base drawing as an image before adding the first emoji
+        if (!this.baseDrawingImage) {
+            this.baseDrawingImage = new Image();
+            this.baseDrawingImage.src = this.canvas.toDataURL();
+            this.baseDrawingImage.onload = () => {
+                this._addEmojiAndRedraw(emoji);
+            };
+            return;
+        }
+        this._addEmojiAndRedraw(emoji);
+    }
+
+    _addEmojiAndRedraw(emoji) {
         const element = {
             type: 'emoji',
             content: emoji,
@@ -455,7 +469,6 @@ class Whiteboard {
             isCropping: false,
             lastClickTime: 0
         };
-        
         this.draggableElements.push(element);
         this.selectedImage = element;
         this.redrawCanvas();
@@ -1011,11 +1024,15 @@ class Whiteboard {
     }
 
     redrawCanvas() {
-        // Clear canvas
-        this.ctx.fillStyle = 'white';
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-        
-        // Draw all elements
+        // Draw the base drawing if it exists, otherwise fill white
+        if (this.baseDrawingImage) {
+            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            this.ctx.drawImage(this.baseDrawingImage, 0, 0, this.canvas.width, this.canvas.height);
+        } else {
+            this.ctx.fillStyle = 'white';
+            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        }
+        // Draw all draggable elements (emojis, images, gifs)
         this.draggableElements.forEach(element => {
             if (element.type === 'emoji') {
                 // Save context state
@@ -1063,7 +1080,7 @@ class Whiteboard {
 
                 // Check if NFT minter is set
                 if (!this.nftMinter) {
-                    showNotification('NFT contract not initialized. Please reconnect your wallet or refresh the page.', 'error');
+                    showNotification('Whooossssshhh!!! Kaboooommmm!! Gmalakaaa!! Gmonadddd!! Heres your NFT', 'error');
                     return;
                 }
 
@@ -1096,6 +1113,9 @@ class Whiteboard {
             // Show success message
             showNotification(`NFT minted successfully!<br>Transaction Hash: <a href='https://testnet.monadexplorer.com/tx/${result.transactionHash}' target='_blank' style='color:#fff;text-decoration:underline;'>${result.transactionHash.slice(0, 10)}...</a>`, 'success', 7000);
             
+            // Refresh the NFT display
+            await this.initializeNFTDisplay();
+            
             console.log('Minting successful:', result);
         } catch (error) {
             console.error('Error minting NFT:', error);
@@ -1112,6 +1132,101 @@ class Whiteboard {
         const mintBtn = document.getElementById('mintNFT');
         if (mintBtn) {
             mintBtn.disabled = !minter;
+        }
+        // Initialize NFT display when minter is set
+        if (minter) {
+            this.initializeNFTDisplay();
+        }
+    }
+
+    async initializeNFTDisplay() {
+        const nftGrid = document.getElementById('nftGrid');
+        if (!nftGrid || !this.nftMinter) return;
+
+        try {
+            // Clear existing content
+            nftGrid.innerHTML = `
+                <div class="loading-spinner">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <span>Loading your NFTs...</span>
+                </div>
+            `;
+
+            // Get current account
+            const accounts = await window.web3.eth.getAccounts();
+            if (!accounts || accounts.length === 0) {
+                throw new Error('No wallet connected');
+            }
+
+            // Fetch NFTs for the current account
+            const nfts = await this.nftMinter.getNFTsByOwner(accounts[0]);
+            
+            // Clear loading spinner
+            nftGrid.innerHTML = '';
+
+            if (!nfts || nfts.length === 0) {
+                nftGrid.innerHTML = `
+                    <div class="no-nfts-message">
+                        <i class="fas fa-paint-brush"></i>
+                        <p>You haven't minted any NFTs yet. Start creating!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // Display each NFT
+            nfts.forEach(async (nft, index) => {
+                const tokenURI = await this.nftMinter.contract.methods.tokenURI(nft.tokenId).call();
+                const metadata = await this.fetchNFTMetadata(tokenURI);
+                
+                const nftCard = document.createElement('div');
+                nftCard.className = 'nft-card';
+                nftCard.innerHTML = `
+                    <img src="${metadata.image}" alt="NFT ${nft.tokenId}" class="nft-image">
+                    <div class="nft-info">
+                        <h3 class="nft-title">Monad NFT #${nft.tokenId}</h3>
+                        <div class="nft-details">
+                            <p>Created: ${new Date(nft.timestamp * 1000).toLocaleDateString()}</p>
+                            <p><a href="https://testnet.monadexplorer.com/token/${this.nftMinter.contract._address}/instance/${nft.tokenId}" target="_blank">View on Explorer</a></p>
+                        </div>
+                    </div>
+                `;
+
+                nftGrid.appendChild(nftCard);
+            });
+        } catch (error) {
+            console.error('Error loading NFTs:', error);
+            nftGrid.innerHTML = `
+                <div class="no-nfts-message">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <p>Error loading NFTs. Please try again later.</p>
+                </div>
+            `;
+        }
+    }
+
+    async fetchNFTMetadata(tokenURI) {
+        try {
+            // If the URI is an IPFS URI, convert it to use a gateway
+            if (tokenURI.startsWith('ipfs://')) {
+                tokenURI = tokenURI.replace('ipfs://', 'https://ipfs.io/ipfs/');
+            }
+            
+            const response = await fetch(tokenURI);
+            const metadata = await response.json();
+            
+            // Convert IPFS image URL to gateway URL if needed
+            if (metadata.image && metadata.image.startsWith('ipfs://')) {
+                metadata.image = metadata.image.replace('ipfs://', 'https://ipfs.io/ipfs/');
+            }
+            
+            return metadata;
+        } catch (error) {
+            console.error('Error fetching NFT metadata:', error);
+            return {
+                name: 'Unknown NFT',
+                image: 'https://via.placeholder.com/400?text=NFT+Image+Not+Found'
+            };
         }
     }
 }

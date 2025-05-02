@@ -547,6 +547,34 @@ class NFTMinter {
             throw error;
         }
     }
+
+    async getNFTsByOwner(ownerAddress) {
+        try {
+            const tokenCount = await this.contract.methods.getTokenCount().call();
+            const nfts = [];
+            for (let tokenId = 0; tokenId < tokenCount; tokenId++) {
+                let owner;
+                try {
+                    owner = await this.contract.methods.ownerOf(tokenId).call();
+                } catch (e) {
+                    continue; // Token might not exist
+                }
+                console.log(`Checking tokenId ${tokenId}: owner is ${owner}`);
+                if (owner.toLowerCase() === ownerAddress.toLowerCase()) {
+                    // Get creation timestamp if available
+                    let timestamp = 0;
+                    try {
+                        timestamp = await this.contract.methods.getCreationTimestamp(tokenId).call();
+                    } catch (e) {}
+                    nfts.push({ tokenId, timestamp });
+                }
+            }
+            return nfts;
+        } catch (error) {
+            console.error('Error in getNFTsByOwner:', error);
+            return [];
+        }
+    }
 }
 
 // Function to connect the whiteboard to the NFT minter
