@@ -3,6 +3,15 @@ class Whiteboard {
         console.log('Initializing Whiteboard...');
         this.canvas = document.getElementById('whiteboard');
         this.ctx = this.canvas.getContext('2d');
+        
+        // Create separate canvases for drawings and images
+        this.drawingCanvas = document.createElement('canvas');
+        this.imageCanvas = document.createElement('canvas');
+        
+        // Get contexts
+        this.drawingCtx = this.drawingCanvas.getContext('2d');
+        this.imageCtx = this.imageCanvas.getContext('2d');
+        
         this.isDrawing = false;
         this.lastX = 0;
         this.lastY = 0;
@@ -30,6 +39,15 @@ class Whiteboard {
         this.draggableElements = [];
         this.nftMinter = null;
 
+        // Add pixel tracking for proper erasing
+        this.drawnPixels = new Set(); // Track which pixels have been drawn
+        this.baseCanvas = document.createElement('canvas'); // Store clean canvas state
+        this.baseCanvas.width = this.canvas.width;
+        this.baseCanvas.height = this.canvas.height;
+        this.baseCtx = this.baseCanvas.getContext('2d');
+        this.baseCtx.fillStyle = 'white';
+        this.baseCtx.fillRect(0, 0, this.baseCanvas.width, this.baseCanvas.height);
+
         // Add new properties for drag and drop
         this.draggedElement = null;
         this.dragStartX = 0;
@@ -45,6 +63,24 @@ class Whiteboard {
         this.selectedImage = null;
         this.baseDrawingImage = null; // Store the base drawing
 
+        // Add text properties
+        this.isAddingText = false;
+        this.textContent = '';
+        this.fontSize = 24;
+        this.fontFamily = 'Arial';
+        this.textX = 0;
+        this.textY = 0;
+
+        // Add element management properties
+        this.elements = [];
+        this.selectedElement = null;
+        this.isDragging = false;
+        this.isCropping = false;
+        this.dragStartX = 0;
+        this.dragStartY = 0;
+        this.lastClickTime = 0;
+        this.doubleClickThreshold = 300;
+
         // Initialize the canvas and tools
         this.setupCanvas();
         this.setupTools();
@@ -56,75 +92,107 @@ class Whiteboard {
     }
 
     setupCanvas() {
+        // Set canvas dimensions
         this.canvas.width = this.canvas.offsetWidth;
         this.canvas.height = this.canvas.offsetHeight;
-        this.ctx.fillStyle = 'white';
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-        this.saveState();
+        
+        // Set drawing canvas dimensions
+        this.drawingCanvas.width = this.canvas.width;
+        this.drawingCanvas.height = this.canvas.height;
+        
+        // Set image canvas dimensions
+        this.imageCanvas.width = this.canvas.width;
+        this.imageCanvas.height = this.canvas.height;
+        
+        // Fill drawing canvas with white
+        this.drawingCtx.fillStyle = 'white';
+        this.drawingCtx.fillRect(0, 0, this.drawingCanvas.width, this.drawingCanvas.height);
+        
+        // Initialize drawing context properties
+        this.drawingCtx.lineCap = 'round';
+        this.drawingCtx.lineJoin = 'round';
+        
+        this.redrawCanvas();
     }
 
     setupEventListeners() {
-        // Mouse events
+        // Mouse events for drawing
         this.canvas.addEventListener('mousedown', (e) => {
             const rect = this.canvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
 
+            if (['pencil', 'brush', 'spray', 'eraser', 'blur', 'smudge', 'dotted'].includes(this.currentTool)) {
+                this.isDrawing = true;
+                this.lastX = x;
+                this.lastY = y;
+                return;
+            }
+
+            // Handle element manipulation
             const currentTime = new Date().getTime();
             const timeSinceLastClick = currentTime - this.lastClickTime;
+            const element = this.findElementAtPosition(x, y);
 
-            // Clear selection if clicking outside the selected image
-            if (this.selectedImage) {
-                const element = this.findElementAtPosition(x, y);
-                if (!element || element !== this.selectedImage) {
-                    this.selectedImage = null;
-                    this.isDragging = false;
-                    this.isCropping = false;
-                }
-            }
-
-            if (timeSinceLastClick < this.doubleClickThreshold) {
-                // Double click detected
-                this.handleDoubleClick(e);
+            if (timeSinceLastClick < this.doubleClickThreshold && element) {
+                this.selectedElement = element;
+                this.isCropping = true;
+                this.isDragging = false;
+            } else if (element) {
+                this.selectedElement = element;
+                this.isDragging = true;
+                this.isCropping = false;
+                this.dragStartX = x - element.x;
+                this.dragStartY = y - element.y;
             } else {
-                // Single click
-                if (this.selectedImage) {
-                    this.isDragging = true;
-                    this.dragStartX = x;
-                    this.dragStartY = y;
-                } else if (this.currentTool !== 'crop' && this.currentTool !== 'resize') {
-                    // Only start drawing if not in crop or resize mode
-                    this.startDrawing(e);
-                }
+                this.selectedElement = null;
+                this.isDragging = false;
+                this.isCropping = false;
             }
+
             this.lastClickTime = currentTime;
+            this.redrawCanvas();
         });
 
         this.canvas.addEventListener('mousemove', (e) => {
-            if (this.isDragging && this.selectedImage) {
-                this.handleImageDrag(e);
-            } else if (this.isCropping && this.selectedImage) {
-                this.handleImageCrop(e);
-            } else if (this.isDrawing) {
+            const rect = this.canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            if (this.isDrawing) {
                 this.draw(e);
+                this.lastX = x;
+                this.lastY = y;
+                return;
+            }
+
+            if (this.selectedElement) {
+                if (this.isDragging) {
+                    this.selectedElement.x = x - this.dragStartX;
+                    this.selectedElement.y = y - this.dragStartY;
+                } else if (this.isCropping) {
+                    const dx = x - (this.selectedElement.x + this.selectedElement.width/2);
+                    const dy = y - (this.selectedElement.y + this.selectedElement.height/2);
+                    const scale = Math.max(0.1, Math.sqrt(dx*dx + dy*dy) / Math.sqrt(this.selectedElement.width*this.selectedElement.width/4 + this.selectedElement.height*this.selectedElement.height/4));
+                    this.selectedElement.scale = scale;
+                }
+                this.redrawCanvas();
             }
         });
 
         this.canvas.addEventListener('mouseup', () => {
-            if (this.isDragging || this.isCropping) {
-                this.isDragging = false;
-                this.isCropping = false;
+            if (this.isDrawing) {
+                this.isDrawing = false;
                 this.saveState();
-            } else {
-                this.stopDrawing();
+            } else if (this.isDragging || this.isCropping) {
+                this.saveState();
             }
+            this.isDragging = false;
         });
 
         this.canvas.addEventListener('mouseleave', () => {
-            if (this.isDragging) {
-                this.handleDragEnd();
-            }
-            this.stopDrawing();
+            this.isDrawing = false;
+            this.isDragging = false;
         });
 
         // Touch events for mobile support
@@ -165,7 +233,7 @@ class Whiteboard {
         const sizeSlider = document.getElementById('sizeSlider');
         if (sizeSlider) {
             sizeSlider.addEventListener('input', (e) => {
-                this.size = e.target.value;
+                this.size = parseInt(e.target.value);
             });
         }
 
@@ -180,25 +248,7 @@ class Whiteboard {
             imageInput.addEventListener('change', (e) => {
                 const file = e.target.files[0];
                 if (file) {
-                    const reader = new FileReader();
-                    reader.onload = (event) => {
-                        const img = new Image();
-                        img.onload = () => {
-                            const element = {
-                                type: 'image',
-                                image: img,
-                                x: 0,
-                                y: 0,
-                                width: this.canvas.width,
-                                height: this.canvas.height
-                            };
-                            this.draggableElements.push(element);
-                            this.redrawCanvas();
-                            this.saveState();
-                        };
-                        img.src = event.target.result;
-                    };
-                    reader.readAsDataURL(file);
+                    this.handleImageUpload(file);
                 }
             });
         }
@@ -266,6 +316,15 @@ class Whiteboard {
                 this.redo();
             });
         }
+
+        this.canvas.addEventListener('click', (e) => {
+            if (this.currentTool === 'text' && this.textContent) {
+                const rect = this.canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                this.addText(x, y);
+            }
+        });
     }
 
     setupTools() {
@@ -275,21 +334,31 @@ class Whiteboard {
                 this.clearActiveStates();
                 this.currentTool = 'pencil';
                 document.getElementById('pencil').classList.add('active');
+                document.getElementById('textControls').style.display = 'none';
             },
             'brush': () => {
                 this.clearActiveStates();
                 this.currentTool = 'brush';
                 document.getElementById('brush').classList.add('active');
+                document.getElementById('textControls').style.display = 'none';
             },
             'spray': () => {
                 this.clearActiveStates();
                 this.currentTool = 'spray';
                 document.getElementById('spray').classList.add('active');
+                document.getElementById('textControls').style.display = 'none';
             },
             'eraser': () => {
                 this.clearActiveStates();
                 this.currentTool = 'eraser';
                 document.getElementById('eraser').classList.add('active');
+                document.getElementById('textControls').style.display = 'none';
+            },
+            'text': () => {
+                this.clearActiveStates();
+                this.currentTool = 'text';
+                document.getElementById('text').classList.add('active');
+                document.getElementById('textControls').style.display = 'block';
             },
             'blur': () => {
                 this.clearActiveStates();
@@ -327,6 +396,31 @@ class Whiteboard {
                 toolElement.addEventListener('click', tools[toolId]);
             }
         });
+
+        // Setup text controls
+        const textInput = document.getElementById('textInput');
+        const fontFamily = document.getElementById('fontFamily');
+        const fontSize = document.getElementById('fontSize');
+        const fontSizeValue = document.getElementById('fontSizeValue');
+
+        if (textInput) {
+            textInput.addEventListener('input', (e) => {
+                this.textContent = e.target.value;
+            });
+        }
+
+        if (fontFamily) {
+            fontFamily.addEventListener('change', (e) => {
+                this.fontFamily = e.target.value;
+            });
+        }
+
+        if (fontSize) {
+            fontSize.addEventListener('input', (e) => {
+                this.fontSize = parseInt(e.target.value);
+                fontSizeValue.textContent = `${this.fontSize}px`;
+            });
+        }
     }
 
     clearActiveStates() {
@@ -341,6 +435,15 @@ class Whiteboard {
         this.isCropping = false;
         this.isResizing = false;
         this.selectedImage = null;
+        this.isAddingText = false;
+        
+        // Reset element selection
+        this.selectedElement = null;
+        
+        // Reset drawing tool state
+        if (['pencil', 'brush', 'spray', 'eraser', 'blur', 'smudge', 'dotted'].includes(this.currentTool)) {
+            this.isDrawing = false;
+        }
     }
 
     setupEmojiPicker() {
@@ -442,20 +545,6 @@ class Whiteboard {
     }
 
     addEmoji(emoji) {
-        console.log('Adding emoji:', emoji);
-        // Store the base drawing as an image before adding the first emoji
-        if (!this.baseDrawingImage) {
-            this.baseDrawingImage = new Image();
-            this.baseDrawingImage.src = this.canvas.toDataURL();
-            this.baseDrawingImage.onload = () => {
-                this._addEmojiAndRedraw(emoji);
-            };
-            return;
-        }
-        this._addEmojiAndRedraw(emoji);
-    }
-
-    _addEmojiAndRedraw(emoji) {
         const element = {
             type: 'emoji',
             content: emoji,
@@ -463,24 +552,12 @@ class Whiteboard {
             y: this.canvas.height / 2 - 25,
             width: 50,
             height: 50,
-            scale: 1,
             rotation: 0,
-            isDragging: false,
-            isCropping: false,
-            lastClickTime: 0
+            scale: 1
         };
-        this.draggableElements.push(element);
-        this.selectedImage = element;
+        this.elements.push(element);
         this.redrawCanvas();
         this.saveState();
-    }
-
-    startDrawing(e) {
-        if (this.isCropping || this.isResizing) return;
-        this.isDrawing = true;
-        const rect = this.canvas.getBoundingClientRect();
-        this.lastX = e.clientX - rect.left;
-        this.lastY = e.clientY - rect.top;
     }
 
     draw(e) {
@@ -489,10 +566,6 @@ class Whiteboard {
         const rect = this.canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
-
-        this.ctx.lineJoin = 'round';
-        this.ctx.lineCap = 'round';
-        this.ctx.lineWidth = this.size;
 
         switch (this.currentTool) {
             case 'pencil':
@@ -517,73 +590,71 @@ class Whiteboard {
                 this.drawDottedLine(x, y);
                 break;
         }
-
-        this.lastX = x;
-        this.lastY = y;
-    }
-
-    stopDrawing() {
-        if (this.isDrawing) {
-            this.isDrawing = false;
-            this.saveState();
-        }
     }
 
     drawPencil(x, y) {
-        this.ctx.strokeStyle = this.color;
-        this.ctx.beginPath();
-        this.ctx.moveTo(this.lastX, this.lastY);
-        this.ctx.lineTo(x, y);
-        this.ctx.stroke();
+        this.drawingCtx.beginPath();
+        this.drawingCtx.moveTo(this.lastX, this.lastY);
+        this.drawingCtx.lineTo(x, y);
+        this.drawingCtx.strokeStyle = this.color;
+        this.drawingCtx.lineWidth = this.size;
+        this.drawingCtx.stroke();
+        this.redrawCanvas();
     }
 
     drawBrush(x, y) {
-        this.ctx.strokeStyle = this.color;
-        this.ctx.lineWidth = this.size * 2;
-        this.ctx.beginPath();
-        this.ctx.moveTo(this.lastX, this.lastY);
-        this.ctx.lineTo(x, y);
-        this.ctx.stroke();
+        this.drawingCtx.beginPath();
+        this.drawingCtx.moveTo(this.lastX, this.lastY);
+        this.drawingCtx.lineTo(x, y);
+        this.drawingCtx.strokeStyle = this.color;
+        this.drawingCtx.lineWidth = this.size * 2;
+        this.drawingCtx.stroke();
+        this.redrawCanvas();
     }
 
     drawSpray(x, y) {
-        this.ctx.fillStyle = this.color;
-        const radius = this.size * 2;
         const density = 50;
-        
+        const radius = this.size * 2;
+
+        this.drawingCtx.fillStyle = this.color;
         for (let i = 0; i < density; i++) {
-            const angle = Math.random() * Math.PI * 2;
-            const distance = Math.random() * radius;
-            const sprayX = x + Math.cos(angle) * distance;
-            const sprayY = y + Math.sin(angle) * distance;
-            
-            this.ctx.beginPath();
-            this.ctx.arc(sprayX, sprayY, 1, 0, Math.PI * 2);
-            this.ctx.fill();
+            const offsetX = (Math.random() * 2 - 1) * radius;
+            const offsetY = (Math.random() * 2 - 1) * radius;
+            const sprayX = x + offsetX;
+            const sprayY = y + offsetY;
+
+            this.drawingCtx.beginPath();
+            this.drawingCtx.arc(sprayX, sprayY, 1, 0, Math.PI * 2);
+            this.drawingCtx.fill();
         }
+        this.redrawCanvas();
     }
 
     drawEraser(x, y) {
-        this.ctx.strokeStyle = 'white';
-        this.ctx.lineWidth = this.size * 2;
-        this.ctx.beginPath();
-        this.ctx.moveTo(this.lastX, this.lastY);
-        this.ctx.lineTo(x, y);
-        this.ctx.stroke();
+        this.drawingCtx.save();
+        this.drawingCtx.beginPath();
+        this.drawingCtx.arc(x, y, this.size * 2, 0, Math.PI * 2);
+        this.drawingCtx.globalCompositeOperation = 'destination-out';
+        this.drawingCtx.fillStyle = 'rgba(255, 255, 255, 1)';
+        this.drawingCtx.fill();
+        this.drawingCtx.restore();
+        this.redrawCanvas();
     }
 
     drawDottedLine(x, y) {
-        this.ctx.strokeStyle = this.color;
-        this.ctx.setLineDash(this.dottedLineDash);
-        this.ctx.beginPath();
-        this.ctx.moveTo(this.lastX, this.lastY);
-        this.ctx.lineTo(x, y);
-        this.ctx.stroke();
-        this.ctx.setLineDash([]);
+        this.drawingCtx.beginPath();
+        this.drawingCtx.setLineDash([5, 5]);
+        this.drawingCtx.moveTo(this.lastX, this.lastY);
+        this.drawingCtx.lineTo(x, y);
+        this.drawingCtx.strokeStyle = this.color;
+        this.drawingCtx.lineWidth = this.size;
+        this.drawingCtx.stroke();
+        this.drawingCtx.setLineDash([]);
+        this.redrawCanvas();
     }
 
     applyBlur(x, y) {
-        const imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+        const imageData = this.drawingCtx.getImageData(0, 0, this.canvas.width, this.canvas.height);
         const data = imageData.data;
         const radius = this.blurRadius;
         
@@ -602,7 +673,8 @@ class Whiteboard {
             }
         }
         
-        this.ctx.putImageData(imageData, 0, 0);
+        this.drawingCtx.putImageData(imageData, 0, 0);
+        this.redrawCanvas();
     }
 
     applySmudge(x, y) {
@@ -612,8 +684,8 @@ class Whiteboard {
         tempCanvas.width = radius * 2;
         tempCanvas.height = radius * 2;
 
-        // Get the area around the cursor
-        const imageData = this.ctx.getImageData(
+        // Get the area around the cursor from drawing canvas
+        const imageData = this.drawingCtx.getImageData(
             Math.max(0, x - radius),
             Math.max(0, y - radius),
             Math.min(radius * 2, this.canvas.width - x + radius),
@@ -628,30 +700,29 @@ class Whiteboard {
         const data = tempImageData.data;
         
         for (let i = 0; i < data.length; i += 4) {
-            // Only process non-transparent pixels
             if (data[i + 3] > 0) {
-                // Slightly darken the color
                 data[i] = Math.max(0, data[i] - 10);
                 data[i + 1] = Math.max(0, data[i + 1] - 10);
                 data[i + 2] = Math.max(0, data[i + 2] - 10);
-                
-                // Reduce opacity slightly
                 data[i + 3] = Math.max(0, data[i + 3] - 20);
             }
         }
         
         tempCtx.putImageData(tempImageData, 0, 0);
 
-        // Draw the smudged area back to the canvas with a slight offset
+        // Draw the smudged area back to drawing canvas
         const offsetX = (Math.random() - 0.5) * 3;
         const offsetY = (Math.random() - 0.5) * 3;
         
-        this.ctx.globalCompositeOperation = 'source-over';
-        this.ctx.drawImage(
+        this.drawingCtx.globalCompositeOperation = 'source-over';
+        this.drawingCtx.drawImage(
             tempCanvas,
             x - radius + offsetX,
             y - radius + offsetY
         );
+        
+        // Update display
+        this.redrawCanvas();
     }
 
     startCropMode() {
@@ -764,30 +835,40 @@ class Whiteboard {
     saveState() {
         this.currentHistoryIndex++;
         this.history = this.history.slice(0, this.currentHistoryIndex);
-        this.history.push(this.canvas.toDataURL());
+        this.history.push({
+            elements: JSON.parse(JSON.stringify(this.elements)),
+            drawingCanvas: this.drawingCanvas.toDataURL()
+        });
     }
 
     undo() {
         if (this.currentHistoryIndex > 0) {
             this.currentHistoryIndex--;
+            const state = this.history[this.currentHistoryIndex];
+            this.elements = JSON.parse(JSON.stringify(state.elements));
+            
             const img = new Image();
             img.onload = () => {
-                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-                this.ctx.drawImage(img, 0, 0);
+                this.drawingCtx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                this.drawingCtx.drawImage(img, 0, 0);
+                this.redrawCanvas();
             };
-            img.src = this.history[this.currentHistoryIndex];
+            img.src = state.drawingCanvas;
         }
     }
 
     redo() {
         if (this.currentHistoryIndex < this.history.length - 1) {
             this.currentHistoryIndex++;
+            const state = this.history[this.currentHistoryIndex];
+            
             const img = new Image();
             img.onload = () => {
-                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-                this.ctx.drawImage(img, 0, 0);
+                this.drawingCtx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                this.drawingCtx.drawImage(img, 0, 0);
+                this.redrawCanvas();
             };
-            img.src = this.history[this.currentHistoryIndex];
+            img.src = state.drawingCanvas;
         }
     }
 
@@ -799,273 +880,107 @@ class Whiteboard {
     }
 
     findElementAtPosition(x, y) {
-        for (let i = this.draggableElements.length - 1; i >= 0; i--) {
-            const element = this.draggableElements[i];
-            if (element.type === 'emoji') {
-                const centerX = element.x + element.width / 2;
-                const centerY = element.y + element.height / 2;
-                const distance = Math.sqrt(
-                    Math.pow(x - centerX, 2) + 
-                    Math.pow(y - centerY, 2)
-                );
-                if (distance <= element.width / 2) {
-                    return element;
-                }
+        // Search in reverse order (top to bottom)
+        for (let i = this.elements.length - 1; i >= 0; i--) {
+            const element = this.elements[i];
+            const bounds = this.getElementBounds(element);
+            
+            if (x >= bounds.x && x <= bounds.x + bounds.width &&
+                y >= bounds.y && y <= bounds.y + bounds.height) {
+                return element;
             }
         }
         return null;
     }
 
-    handleDragStart(e, element) {
-        const rect = this.canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-
-        this.isDragging = true;
-        this.draggedElement = element;
-        this.dragStartX = x - element.x;
-        this.dragStartY = y - element.y;
-
-        // Move the element to the top of the stack
-        const index = this.draggableElements.indexOf(element);
-        if (index !== -1) {
-            this.draggableElements.splice(index, 1);
-            this.draggableElements.push(element);
-        }
-    }
-
-    handleDrag(e) {
-        if (!this.selectedImage || !this.selectedImage.isDragging) return;
-
-        const rect = this.canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-
-        const dx = x - this.dragStartX;
-        const dy = y - this.dragStartY;
-
-        this.selectedImage.x += dx;
-        this.selectedImage.y += dy;
-
-        // Keep emoji within canvas bounds
-        this.selectedImage.x = Math.max(0, Math.min(this.canvas.width - this.selectedImage.width, this.selectedImage.x));
-        this.selectedImage.y = Math.max(0, Math.min(this.canvas.height - this.selectedImage.height, this.selectedImage.y));
-
-        this.dragStartX = x;
-        this.dragStartY = y;
-        this.redrawCanvas();
-    }
-
-    handleDragEnd() {
-        this.isDragging = false;
-        this.draggedElement = null;
-        this.saveState();
-    }
-
-    handleCropStart(e) {
-        const rect = this.canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-
-        this.cropMode = true;
-        this.cropSelection = {
-            startX: x,
-            startY: y,
-            endX: x,
-            endY: y
+    getElementBounds(element) {
+        const scale = element.scale || 1;
+        return {
+            x: element.x,
+            y: element.y,
+            width: element.width * scale,
+            height: element.height * scale
         };
     }
 
-    handleCropMove(e) {
-        if (!this.cropSelection) return;
-
-        const rect = this.canvas.getBoundingClientRect();
-        this.cropSelection.endX = e.clientX - rect.left;
-        this.cropSelection.endY = e.clientY - rect.top;
-
-        this.redrawCanvas();
-        this.drawCropSelection();
-    }
-
-    handleCropEnd() {
-        if (!this.cropSelection) return;
-
-        const width = Math.abs(this.cropSelection.endX - this.cropSelection.startX);
-        const height = Math.abs(this.cropSelection.endY - this.cropSelection.startY);
-        const x = Math.min(this.cropSelection.startX, this.cropSelection.endX);
-        const y = Math.min(this.cropSelection.startY, this.cropSelection.endY);
-
-        if (width > 10 && height > 10) { // Minimum crop size
-            // Create a new canvas for the cropped image
-            const tempCanvas = document.createElement('canvas');
-            const tempCtx = tempCanvas.getContext('2d');
-            tempCanvas.width = width;
-            tempCanvas.height = height;
-
-            // Draw the cropped portion
-            tempCtx.drawImage(
-                this.canvas,
-                x, y, width, height,
-                0, 0, width, height
-            );
-
-            // Clear the main canvas
-            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-
-            // Draw the cropped image
-            this.ctx.drawImage(tempCanvas, 0, 0);
-
-            // Update the draggable elements
-            this.draggableElements = [{
-                type: 'image',
-                image: tempCanvas,
-                x: 0,
-                y: 0,
-                width: width,
-                height: height
-            }];
-        }
-
-        this.cropMode = false;
-        this.cropSelection = null;
-        this.saveState();
-    }
-
-    drawCropSelection() {
-        if (!this.cropSelection) return;
-
-        const width = Math.abs(this.cropSelection.endX - this.cropSelection.startX);
-        const height = Math.abs(this.cropSelection.endY - this.cropSelection.startY);
-        const x = Math.min(this.cropSelection.startX, this.cropSelection.endX);
-        const y = Math.min(this.cropSelection.startY, this.cropSelection.endY);
-
-        // Draw the crop selection rectangle
-        this.ctx.strokeStyle = '#9F7AEA';
-        this.ctx.lineWidth = 2;
-        this.ctx.setLineDash([5, 5]);
-        this.ctx.strokeRect(x, y, width, height);
-        this.ctx.setLineDash([]);
-    }
-
-    handleDoubleClick(e) {
-        const rect = this.canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-
-        // Find the element at the click position
-        const element = this.findElementAtPosition(x, y);
-        if (element) {
-            const currentTime = new Date().getTime();
-            const timeSinceLastClick = currentTime - element.lastClickTime;
-            
-            if (timeSinceLastClick < 300) { // Double click detected
-                console.log('Double click detected on element:', element);
-                this.selectedImage = element;
-                element.isCropping = true;
-                element.cropStartX = x;
-                element.cropStartY = y;
-                this.redrawCanvas();
-            }
-            
-            element.lastClickTime = currentTime;
-        }
-    }
-
-    handleImageDrag(e) {
-        if (!this.selectedImage) return;
-
-        const rect = this.canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-
-        // Calculate movement
-        const dx = x - this.dragStartX;
-        const dy = y - this.dragStartY;
-
-        // Update image position
-        this.selectedImage.x += dx;
-        this.selectedImage.y += dy;
-
-        // Keep within canvas bounds
-        this.selectedImage.x = Math.max(0, Math.min(this.canvas.width - this.selectedImage.width, this.selectedImage.x));
-        this.selectedImage.y = Math.max(0, Math.min(this.canvas.height - this.selectedImage.height, this.selectedImage.y));
-
-        // Update drag start position
-        this.dragStartX = x;
-        this.dragStartY = y;
-
-        this.redrawCanvas();
-    }
-
-    handleImageCrop(e) {
-        if (!this.selectedImage) return;
-
-        const rect = this.canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-
-        // Calculate new dimensions
-        const width = Math.abs(x - this.cropStartX);
-        const height = Math.abs(y - this.cropStartY);
-
-        // Update image size
-        this.selectedImage.width = Math.max(50, width); // Minimum width
-        this.selectedImage.height = Math.max(50, height); // Minimum height
-
-        // Update position if needed
-        if (x < this.cropStartX) {
-            this.selectedImage.x = x;
-        }
-        if (y < this.cropStartY) {
-            this.selectedImage.y = y;
-        }
-
-        this.redrawCanvas();
-    }
-
     redrawCanvas() {
-        // Draw the base drawing if it exists, otherwise fill white
-        if (this.baseDrawingImage) {
-            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-            this.ctx.drawImage(this.baseDrawingImage, 0, 0, this.canvas.width, this.canvas.height);
-        } else {
-            this.ctx.fillStyle = 'white';
-            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-        }
-        // Draw all draggable elements (emojis, images, gifs)
-        this.draggableElements.forEach(element => {
-            if (element.type === 'emoji') {
-                // Save context state
-                this.ctx.save();
-                
-                // Move to element position and apply transformations
-                this.ctx.translate(element.x + element.width / 2, element.y + element.height / 2);
-                this.ctx.rotate(element.rotation);
-                this.ctx.scale(element.scale, element.scale);
-                
-                // Draw emoji
-                this.ctx.font = `${element.height}px Arial`;
-                this.ctx.textAlign = 'center';
-                this.ctx.textBaseline = 'middle';
-                this.ctx.fillText(element.content, 0, 0);
-                
-                // Draw selection box if this element is selected
-                if (this.selectedImage === element) {
-                    this.ctx.strokeStyle = '#9F7AEA';
-                    this.ctx.lineWidth = 2;
-                    this.ctx.setLineDash([5, 5]);
-                    const boxSize = Math.max(element.width, element.height) + 10;
-                    this.ctx.strokeRect(-boxSize/2, -boxSize/2, boxSize, boxSize);
-                    this.ctx.setLineDash([]);
-                }
-                
-                // Restore context state
-                this.ctx.restore();
-            } else if (element.type === 'image') {
-                this.ctx.drawImage(element.image, element.x, element.y, element.width, element.height);
-            } else if (element.type === 'gif') {
-                this.ctx.drawImage(element.image, element.x, element.y, element.width, element.height);
+        // Clear main canvas
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        // Draw white background
+        this.ctx.fillStyle = 'white';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        // Draw from drawing canvas onto main canvas
+        this.ctx.drawImage(this.drawingCanvas, 0, 0);
+        
+        // Draw all elements
+        this.elements.forEach(element => {
+            this.ctx.save();
+            
+            // Apply transformations
+            this.ctx.translate(element.x + element.width/2, element.y + element.height/2);
+            this.ctx.rotate(element.rotation);
+            this.ctx.scale(element.scale, element.scale);
+            
+            switch (element.type) {
+                case 'text':
+                    this.ctx.font = `${element.fontSize}px ${element.fontFamily}`;
+                    this.ctx.fillStyle = element.color;
+                    this.ctx.textBaseline = 'middle';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText(element.content, 0, 0);
+                    break;
+                    
+                case 'image':
+                    this.ctx.drawImage(
+                        element.content,
+                        -element.width/2,
+                        -element.height/2,
+                        element.width,
+                        element.height
+                    );
+                    break;
+                    
+                case 'emoji':
+                    this.ctx.font = `${element.height}px Arial`;
+                    this.ctx.textAlign = 'center';
+                    this.ctx.textBaseline = 'middle';
+                    this.ctx.fillText(element.content, 0, 0);
+                    break;
             }
+            
+            // Draw selection/crop handles if element is selected
+            if (this.selectedElement === element) {
+                this.ctx.strokeStyle = '#7b2ff2';
+                this.ctx.lineWidth = 2;
+                this.ctx.setLineDash([5, 5]);
+                
+                const bounds = this.getElementBounds(element);
+                this.ctx.strokeRect(
+                    -bounds.width/2,
+                    -bounds.height/2,
+                    bounds.width,
+                    bounds.height
+                );
+                
+                if (this.isCropping) {
+                    const handleSize = 8;
+                    this.ctx.fillStyle = '#7b2ff2';
+                    this.ctx.setLineDash([]);
+                    
+                    [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([x, y]) => {
+                        this.ctx.fillRect(
+                            x * bounds.width/2 - handleSize/2,
+                            y * bounds.height/2 - handleSize/2,
+                            handleSize,
+                            handleSize
+                        );
+                    });
+                }
+            }
+            
+            this.ctx.restore();
         });
     }
 
@@ -1227,6 +1142,57 @@ class Whiteboard {
                 name: 'Unknown NFT',
                 image: 'https://via.placeholder.com/400?text=NFT+Image+Not+Found'
             };
+        }
+    }
+
+    handleImageUpload(file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const img = new Image();
+            img.onload = () => {
+                const element = {
+                    type: 'image',
+                    content: img,
+                    x: 0,
+                    y: 0,
+                    width: this.canvas.width,
+                    height: this.canvas.height,
+                    rotation: 0,
+                    scale: 1
+                };
+                this.elements.push(element);
+                this.redrawCanvas();
+                this.saveState();
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    addText(x, y) {
+        const element = {
+            type: 'text',
+            content: this.textContent,
+            x: x,
+            y: y,
+            width: this.drawingCtx.measureText(this.textContent).width,
+            height: this.fontSize,
+            fontSize: this.fontSize,
+            fontFamily: this.fontFamily,
+            color: this.color,
+            rotation: 0,
+            scale: 1
+        };
+        
+        this.elements.push(element);
+        this.redrawCanvas();
+        this.saveState();
+        
+        // Clear the text input
+        const textInput = document.getElementById('textInput');
+        if (textInput) {
+            textInput.value = '';
+            this.textContent = '';
         }
     }
 }

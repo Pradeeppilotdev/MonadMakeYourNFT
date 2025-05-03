@@ -189,6 +189,97 @@
             font-size: 1.1rem;
             grid-column: 1 / -1;
         }
+
+        /* Add text control styles */
+        .control-item {
+            margin: 10px 0;
+            width: 100%;
+        }
+
+        .text-input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid rgba(123,47,242,0.3);
+            border-radius: 8px;
+            background: rgba(123,47,242,0.1);
+            color: #fff;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .text-input:focus {
+            outline: none;
+            border-color: #7b2ff2;
+            box-shadow: 0 0 0 2px rgba(123,47,242,0.2);
+        }
+
+        .text-input::placeholder {
+            color: rgba(255,255,255,0.5);
+        }
+
+        .font-select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid rgba(123,47,242,0.3);
+            border-radius: 8px;
+            background: rgba(123,47,242,0.1);
+            color: #fff;
+            font-size: 14px;
+            cursor: pointer;
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237b2ff2' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 8px center;
+            background-size: 16px;
+            padding-right: 32px;
+        }
+
+        .font-select:focus {
+            outline: none;
+            border-color: #7b2ff2;
+            box-shadow: 0 0 0 2px rgba(123,47,242,0.2);
+        }
+
+        .font-select option {
+            background-color: #1a1b26;
+            color: #fff;
+            padding: 8px;
+        }
+
+        .font-select:hover {
+            border-color: #7b2ff2;
+            background-color: rgba(123,47,242,0.2);
+        }
+
+        /* Make the dropdown menu more visible */
+        .font-select option:hover,
+        .font-select option:focus,
+        .font-select option:active,
+        .font-select option:checked {
+            background: linear-gradient(90deg, #7b2ff2 0%, #f357a8 100%);
+            color: #fff;
+        }
+
+        /* Add a subtle animation */
+        .font-select {
+            transition: all 0.2s ease;
+        }
+
+        .size-slider {
+            width: 100%;
+            margin-top: 5px;
+            accent-color: #7b2ff2;
+        }
+
+        #fontSizeValue {
+            background: rgba(123,47,242,0.2);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #fff;
+        }
     </style>
 </head>
 <body>
@@ -231,7 +322,34 @@
                     <button id="eraser" class="tool" title="Eraser">
                         <i class="fas fa-eraser"></i>
                     </button>
+                    <button id="text" class="tool" title="Add Text">
+                        <i class="fas fa-font"></i>
+                    </button>
                 </div>
+
+                <!-- Add text controls -->
+                <div id="textControls" class="tool-group" style="display: none;">
+                    <h3>Text Options</h3>
+                    <div class="control-item">
+                        <input type="text" id="textInput" placeholder="Enter text..." class="text-input">
+                    </div>
+                    <div class="control-item">
+                        <select id="fontFamily" class="font-select">
+                            <option value="Arial">Arial</option>
+                            <option value="Times New Roman">Times New Roman</option>
+                            <option value="Courier New">Courier New</option>
+                            <option value="Georgia">Georgia</option>
+                            <option value="Verdana">Verdana</option>
+                            <option value="Impact">Impact</option>
+                        </select>
+                    </div>
+                    <div class="control-item">
+                        <label>Font Size:</label>
+                        <input type="range" id="fontSize" min="12" max="72" value="24" class="size-slider">
+                        <span id="fontSizeValue">24px</span>
+                    </div>
+                </div>
+
                 <div class="tool-group">
                     <h3>Effects</h3>
                     <button id="blur" class="tool" title="Blur">
