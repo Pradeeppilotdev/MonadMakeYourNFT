@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.3/contracts/token/ERC721/ERC721.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.3/contracts/access/Ownable.sol";
 
-contract MonadNFT is ERC721 {
+contract MonadNFT is ERC721, Ownable {
     uint256 private _tokenIds;
     uint256 public constant MINT_PRICE = 0.01 ether;
     uint256 public constant MAX_TOKENS = 10000;
@@ -55,7 +55,7 @@ contract MonadNFT is ERC721 {
         return _creationTimestamps[tokenId];
     }
 
-    function withdraw() public {
+    function withdraw() public onlyOwner {
         uint256 balance = address(this).balance;
         payable(msg.sender).transfer(balance);
     }

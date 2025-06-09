@@ -1,5 +1,5 @@
 class NFTMinter {
-    constructor(web3, contractAddress = '0x039dd955015AA04046F20e20445ea523F7992CbA') {
+    constructor(web3, contractAddress = '0xC71d614c27A3B01890412d252138C5A1bFE69791') {
         this.web3 = web3;
         this.contractAddress = contractAddress;
         this.contract = null;
