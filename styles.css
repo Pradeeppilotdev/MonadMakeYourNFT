@@ -344,4 +344,33 @@ input[type="range"]::-webkit-slider-thumb:hover {
         width: 100%;
         justify-content: center;
     }
+}
+
+/* Text tool popover styles */
+.text-tool-popover {
+    position: absolute;
+    left: 90px;
+    top: 120px;
+    background: #232347;
+    border-radius: 10px;
+    box-shadow: 0 4px 24px rgba(123,47,242,0.15);
+    padding: 18px 20px 14px 20px;
+    z-index: 1002;
+    min-width: 220px;
+    display: none;
+    flex-direction: column;
+    gap: 12px;
+    border: 1px solid var(--monad-border);
+}
+.text-tool-popover.active {
+    display: flex;
+}
+
+.undo-redo-buttons {
+    display: flex;
+    flex-direction: row;
+    gap: 12px;
+    justify-content: center;
+    align-items: center;
+    margin-top: 8px;
 } 

@@ -89,6 +89,9 @@ class Whiteboard {
         // Initialize emoji picker immediately
         this.setupEmojiPicker();
         this.setupNFTMinting();
+
+        // In constructor
+        this.lastDot = null;
     }
 
     setupCanvas() {
@@ -122,10 +125,34 @@ class Whiteboard {
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
 
-            if (['pencil', 'brush', 'spray', 'eraser', 'blur', 'smudge', 'dotted'].includes(this.currentTool)) {
+            // Crop/Resize tool: always allow selecting an image, and clicking empty space deselects
+            if (["crop", "resize"].includes(this.currentTool)) {
+                const element = this.findElementAtPosition(x, y);
+                if (element && element.type === "image") {
+                    this.selectedElement = element;
+                    this.isDragging = this.currentTool === "resize";
+                    this.isCropping = this.currentTool === "crop";
+                    this.dragStartX = x - element.x;
+                    this.dragStartY = y - element.y;
+                    console.log('Selected image for', this.currentTool, 'at', x, y);
+                } else {
+                    // Clicked empty space: deselect
+                    this.selectedElement = null;
+                    this.isDragging = false;
+                    this.isCropping = false;
+                    console.log('Deselected image');
+                }
+                this.redrawCanvas();
+                return;
+            }
+
+            if (["pencil", "brush", "spray", "eraser", "blur", "smudge", "dotted"].includes(this.currentTool)) {
                 this.isDrawing = true;
                 this.lastX = x;
                 this.lastY = y;
+                if (this.currentTool === 'dotted') {
+                    this.lastDot = { x, y };
+                }
                 return;
             }
 
@@ -159,6 +186,26 @@ class Whiteboard {
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
 
+            // Crop/Resize logic for images
+            if ((this.isCropping || this.isDragging) && this.selectedElement && this.selectedElement.type === 'image') {
+                if (this.isDragging) {
+                    // Resize: update width/height based on mouse position
+                    const newWidth = Math.max(10, x - this.selectedElement.x);
+                    const newHeight = Math.max(10, y - this.selectedElement.y);
+                    this.selectedElement.width = newWidth;
+                    this.selectedElement.height = newHeight;
+                    console.log('Resizing image to', newWidth, newHeight);
+                } else if (this.isCropping) {
+                    // Crop: update position and size (simple drag for now)
+                    this.selectedElement.x = x - this.dragStartX;
+                    this.selectedElement.y = y - this.dragStartY;
+                    console.log('Cropping/moving image to', this.selectedElement.x, this.selectedElement.y);
+                }
+                this.redrawCanvas();
+                return;
+            }
+
+            // Default move logic
             if (this.isDrawing) {
                 this.draw(e);
                 this.lastX = x;
@@ -188,6 +235,9 @@ class Whiteboard {
                 this.saveState();
             }
             this.isDragging = false;
+            this.isCropping = false;
+            this.lastDot = null;
+            // Do NOT clear selectedElement; keep it for further edits
         });
 
         this.canvas.addEventListener('mouseleave', () => {
@@ -242,10 +292,13 @@ class Whiteboard {
         const imageInput = document.getElementById('imageInput');
         if (uploadImageBtn && imageInput) {
             uploadImageBtn.addEventListener('click', () => {
+                console.log('Upload button clicked');
+                imageInput.value = '';
                 imageInput.click();
             });
 
             imageInput.addEventListener('change', (e) => {
+                console.log('Image input changed');
                 const file = e.target.files[0];
                 if (file) {
                     this.handleImageUpload(file);
@@ -296,8 +349,20 @@ class Whiteboard {
         const clearBtn = document.getElementById('clear');
         if (clearBtn) {
             clearBtn.addEventListener('click', () => {
-                this.ctx.fillStyle = 'white';
-                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                // Clear the drawing canvas
+                this.drawingCtx.clearRect(0, 0, this.drawingCanvas.width, this.drawingCanvas.height);
+                this.drawingCtx.fillStyle = 'white';
+                this.drawingCtx.fillRect(0, 0, this.drawingCanvas.width, this.drawingCanvas.height);
+
+                // Clear elements (images, emojis, text, etc.)
+                this.elements = [];
+
+                // Optionally, reset history
+                this.history = [];
+                this.currentHistoryIndex = -1;
+
+                // Redraw the main canvas
+                this.redrawCanvas();
                 this.saveState();
             });
         }
@@ -334,57 +399,62 @@ class Whiteboard {
                 this.clearActiveStates();
                 this.currentTool = 'pencil';
                 document.getElementById('pencil').classList.add('active');
-                document.getElementById('textControls').style.display = 'none';
+                document.getElementById('textToolPopover').style.display = 'none';
             },
             'brush': () => {
                 this.clearActiveStates();
                 this.currentTool = 'brush';
                 document.getElementById('brush').classList.add('active');
-                document.getElementById('textControls').style.display = 'none';
+                document.getElementById('textToolPopover').style.display = 'none';
             },
             'spray': () => {
                 this.clearActiveStates();
                 this.currentTool = 'spray';
                 document.getElementById('spray').classList.add('active');
-                document.getElementById('textControls').style.display = 'none';
+                document.getElementById('textToolPopover').style.display = 'none';
             },
             'eraser': () => {
                 this.clearActiveStates();
                 this.currentTool = 'eraser';
                 document.getElementById('eraser').classList.add('active');
-                document.getElementById('textControls').style.display = 'none';
+                document.getElementById('textToolPopover').style.display = 'none';
             },
             'text': () => {
                 this.clearActiveStates();
                 this.currentTool = 'text';
                 document.getElementById('text').classList.add('active');
-                document.getElementById('textControls').style.display = 'block';
+                document.getElementById('textToolPopover').style.display = 'flex';
             },
             'blur': () => {
                 this.clearActiveStates();
                 this.currentTool = 'blur';
                 document.getElementById('blur').classList.add('active');
+                document.getElementById('textToolPopover').style.display = 'none';
             },
             'smudge': () => {
                 this.clearActiveStates();
                 this.currentTool = 'smudge';
                 document.getElementById('smudge').classList.add('active');
+                document.getElementById('textToolPopover').style.display = 'none';
             },
             'dotted': () => {
                 this.clearActiveStates();
                 this.currentTool = 'dotted';
                 document.getElementById('dotted').classList.add('active');
+                document.getElementById('textToolPopover').style.display = 'none';
             },
             'crop': () => {
                 this.clearActiveStates();
                 this.currentTool = 'crop';
                 document.getElementById('crop').classList.add('active');
+                document.getElementById('textToolPopover').style.display = 'none';
                 this.startCropMode();
             },
             'resize': () => {
                 this.clearActiveStates();
                 this.currentTool = 'resize';
                 document.getElementById('resize').classList.add('active');
+                document.getElementById('textToolPopover').style.display = 'none';
                 this.startResizeMode();
             }
         };
@@ -642,14 +712,28 @@ class Whiteboard {
     }
 
     drawDottedLine(x, y) {
-        this.drawingCtx.beginPath();
-        this.drawingCtx.setLineDash([5, 5]);
-        this.drawingCtx.moveTo(this.lastX, this.lastY);
-        this.drawingCtx.lineTo(x, y);
-        this.drawingCtx.strokeStyle = this.color;
-        this.drawingCtx.lineWidth = this.size;
-        this.drawingCtx.stroke();
-        this.drawingCtx.setLineDash([]);
+        const dotSpacing = Math.max(4, this.size * 2);
+        const dotRadius = Math.max(1, this.size / 2);
+        if (!this.lastDot) {
+            this.lastDot = { x: this.lastX, y: this.lastY };
+        }
+        let prevX = this.lastDot.x;
+        let prevY = this.lastDot.y;
+        const dx = x - prevX;
+        const dy = y - prevY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        if (distance === 0) return;
+        const steps = Math.floor(distance / dotSpacing);
+        for (let i = 1; i <= steps; i++) {
+            const t = i * dotSpacing / distance;
+            const dotX = prevX + dx * t;
+            const dotY = prevY + dy * t;
+            this.drawingCtx.beginPath();
+            this.drawingCtx.arc(dotX, dotY, dotRadius, 0, 2 * Math.PI);
+            this.drawingCtx.fillStyle = this.color;
+            this.drawingCtx.fill();
+            this.lastDot = { x: dotX, y: dotY };
+        }
         this.redrawCanvas();
     }
 
@@ -835,9 +919,22 @@ class Whiteboard {
     saveState() {
         this.currentHistoryIndex++;
         this.history = this.history.slice(0, this.currentHistoryIndex);
+        // Serialize elements, converting image content to data URL
+        const serializedElements = this.elements.map(el => {
+            if (el.type === 'image') {
+                return {
+                    ...el,
+                    content: el.content.src // store image as data URL
+                };
+            }
+            return { ...el };
+        });
+        // Save selected element index
+        const selectedIndex = this.selectedElement ? this.elements.indexOf(this.selectedElement) : -1;
         this.history.push({
-            elements: JSON.parse(JSON.stringify(this.elements)),
-            drawingCanvas: this.drawingCanvas.toDataURL()
+            elements: serializedElements,
+            drawingCanvas: this.drawingCanvas.toDataURL(),
+            selectedIndex
         });
     }
 
@@ -845,8 +942,18 @@ class Whiteboard {
         if (this.currentHistoryIndex > 0) {
             this.currentHistoryIndex--;
             const state = this.history[this.currentHistoryIndex];
-            this.elements = JSON.parse(JSON.stringify(state.elements));
-            
+            // Restore elements, converting image content back to Image objects
+            this.elements = state.elements.map(el => {
+                if (el.type === 'image') {
+                    const img = new Image();
+                    img.src = el.content;
+                    return { ...el, content: img };
+                }
+                return { ...el };
+            });
+            // Restore selected element
+            this.selectedElement = (state.selectedIndex >= 0) ? this.elements[state.selectedIndex] : null;
+            // Restore drawing canvas
             const img = new Image();
             img.onload = () => {
                 this.drawingCtx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -861,7 +968,18 @@ class Whiteboard {
         if (this.currentHistoryIndex < this.history.length - 1) {
             this.currentHistoryIndex++;
             const state = this.history[this.currentHistoryIndex];
-            
+            // Restore elements, converting image content back to Image objects
+            this.elements = state.elements.map(el => {
+                if (el.type === 'image') {
+                    const img = new Image();
+                    img.src = el.content;
+                    return { ...el, content: img };
+                }
+                return { ...el };
+            });
+            // Restore selected element
+            this.selectedElement = (state.selectedIndex >= 0) ? this.elements[state.selectedIndex] : null;
+            // Restore drawing canvas
             const img = new Image();
             img.onload = () => {
                 this.drawingCtx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -1199,7 +1317,7 @@ class Whiteboard {
 
 // Initialize the whiteboard when the page loads
 window.addEventListener('load', () => {
-    new Whiteboard();
+    window.whiteboard = new Whiteboard();
 });
 
 // Notification function
