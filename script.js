@@ -106,6 +106,10 @@ class Whiteboard {
             }
             window._whiteboardLoadedOnce = true;
         }
+        // Only push initial state if history is empty
+        if (this.history.length === 0) {
+            this.saveState();
+        }
     }
 
     setupCanvas() {
@@ -139,22 +143,22 @@ class Whiteboard {
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
 
-            // Crop/Resize tool: always allow selecting an image, and clicking empty space deselects
+            // Crop/Resize tool: always allow selecting an image or emoji, and clicking empty space deselects
             if (["crop", "resize"].includes(this.currentTool)) {
                 const element = this.findElementAtPosition(x, y);
-                if (element && element.type === "image") {
+                if (element && (element.type === "image" || element.type === "emoji")) {
                     this.selectedElement = element;
                     this.isDragging = this.currentTool === "resize";
                     this.isCropping = this.currentTool === "crop";
                     this.dragStartX = x - element.x;
                     this.dragStartY = y - element.y;
-                    console.log('Selected image for', this.currentTool, 'at', x, y);
+                    console.log('Selected', element.type, 'for', this.currentTool, 'at', x, y);
                 } else {
                     // Clicked empty space: deselect
                     this.selectedElement = null;
                     this.isDragging = false;
                     this.isCropping = false;
-                    console.log('Deselected image');
+                    console.log('Deselected image/emoji');
                 }
                 this.redrawCanvas();
                 return;
@@ -200,20 +204,20 @@ class Whiteboard {
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
 
-            // Crop/Resize logic for images
-            if ((this.isCropping || this.isDragging) && this.selectedElement && this.selectedElement.type === 'image') {
+            // Crop/Resize logic for images and emojis
+            if ((this.isCropping || this.isDragging) && this.selectedElement && (this.selectedElement.type === 'image' || this.selectedElement.type === 'emoji')) {
                 if (this.isDragging) {
                     // Resize: update width/height based on mouse position
                     const newWidth = Math.max(10, x - this.selectedElement.x);
                     const newHeight = Math.max(10, y - this.selectedElement.y);
                     this.selectedElement.width = newWidth;
                     this.selectedElement.height = newHeight;
-                    console.log('Resizing image to', newWidth, newHeight);
+                    console.log('Resizing', this.selectedElement.type, 'to', newWidth, newHeight);
                 } else if (this.isCropping) {
                     // Crop: update position and size (simple drag for now)
                     this.selectedElement.x = x - this.dragStartX;
                     this.selectedElement.y = y - this.dragStartY;
-                    console.log('Cropping/moving image to', this.selectedElement.x, this.selectedElement.y);
+                    console.log('Cropping/moving', this.selectedElement.type, 'to', this.selectedElement.x, this.selectedElement.y);
                 }
                 this.redrawCanvas();
                 return;
@@ -376,12 +380,13 @@ class Whiteboard {
                 this.actions = [];
                 localStorage.removeItem('whiteboardActions');
 
-                // Optionally, reset history
-                this.history = [];
-                this.currentHistoryIndex = -1;
+                // Do NOT reset history, just push cleared state
+                // this.history = [];
+                // this.currentHistoryIndex = -1;
 
                 // Redraw the main canvas
                 this.redrawCanvas();
+                // Push cleared state to history for undo/redo
                 this.saveState();
             });
         }
@@ -957,8 +962,8 @@ class Whiteboard {
     }
 
     saveState() {
-        this.currentHistoryIndex++;
-        this.history = this.history.slice(0, this.currentHistoryIndex);
+        // Only keep up to currentHistoryIndex (discard redo states)
+        this.history = this.history.slice(0, this.currentHistoryIndex + 1);
         // Serialize elements, converting image content to data URL
         const serializedElements = this.elements.map(el => {
             if (el.type === 'image') {
@@ -977,7 +982,8 @@ class Whiteboard {
             selectedIndex,
             actions: JSON.parse(JSON.stringify(this.actions))
         });
-        this.currentHistoryIndex++;
+        // Increment currentHistoryIndex ONCE, after pushing
+        this.currentHistoryIndex = this.history.length - 1;
     }
 
     undo() {
