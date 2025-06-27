@@ -280,6 +280,313 @@
             font-size: 12px;
             color: #fff;
         }
+
+        /* AI Modal Styles */
+        .ai-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(5px);
+        }
+
+        .ai-modal-content {
+            background: linear-gradient(135deg, #1a1b26 0%, #2d2d3a 100%);
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(123,47,242,0.3);
+            border: 2px solid rgba(123,47,242,0.3);
+            max-width: 800px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            animation: modalSlideIn 0.3s ease-out;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9) translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        .ai-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 30px;
+            border-bottom: 2px solid rgba(123,47,242,0.2);
+            background: linear-gradient(90deg, #7b2ff2 0%, #f357a8 100%);
+            color: white;
+            border-radius: 18px 18px 0 0;
+        }
+
+        .ai-modal-header h2 {
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .close-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            transition: all 0.2s;
+        }
+
+        .close-btn:hover {
+            background: rgba(255,255,255,0.3);
+            transform: scale(1.1);
+        }
+
+        .ai-modal-body {
+            padding: 30px;
+        }
+
+        .ai-input-section {
+            margin-bottom: 30px;
+        }
+
+        .ai-input-section label {
+            display: block;
+            margin-bottom: 10px;
+            color: #fff;
+            font-weight: 500;
+            font-size: 1.1rem;
+        }
+
+        .ai-input-section textarea {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid rgba(123,47,242,0.3);
+            border-radius: 12px;
+            background: rgba(123,47,242,0.1);
+            color: #fff;
+            font-size: 1rem;
+            resize: vertical;
+            min-height: 100px;
+            transition: all 0.2s;
+        }
+
+        .ai-input-section textarea:focus {
+            outline: none;
+            border-color: #7b2ff2;
+            box-shadow: 0 0 0 3px rgba(123,47,242,0.2);
+        }
+
+        .ai-input-section textarea::placeholder {
+            color: rgba(255,255,255,0.5);
+        }
+
+        .ai-options {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .ai-option-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .ai-option-group label {
+            color: #fff;
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+
+        .ai-option-group select {
+            padding: 10px;
+            border: 2px solid rgba(123,47,242,0.3);
+            border-radius: 8px;
+            background: rgba(123,47,242,0.1);
+            color: #fff;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .ai-option-group select:focus {
+            outline: none;
+            border-color: #7b2ff2;
+            box-shadow: 0 0 0 2px rgba(123,47,242,0.2);
+        }
+
+        .ai-option-group select option {
+            background-color: #1a1b26;
+            color: #fff;
+        }
+
+        .generate-btn {
+            background: linear-gradient(90deg, #7b2ff2 0%, #f357a8 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            padding: 15px 30px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 20px;
+            width: 100%;
+            justify-content: center;
+        }
+
+        .generate-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(123,47,242,0.4);
+        }
+
+        .generate-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .ai-results-section {
+            border-top: 2px solid rgba(123,47,242,0.2);
+            padding-top: 20px;
+        }
+
+        .ai-results-section h3 {
+            color: #fff;
+            margin-bottom: 20px;
+            font-size: 1.3rem;
+        }
+
+        .ai-results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .ai-result-item {
+            background: rgba(123,47,242,0.1);
+            border: 2px solid rgba(123,47,242,0.3);
+            border-radius: 12px;
+            overflow: hidden;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .ai-result-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(123,47,242,0.3);
+            border-color: #7b2ff2;
+        }
+
+        .ai-result-item img {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+        }
+
+        .ai-result-item .result-actions {
+            padding: 15px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .ai-result-item .result-actions button {
+            flex: 1;
+            padding: 8px 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .ai-result-item .use-image-btn {
+            background: linear-gradient(90deg, #7b2ff2 0%, #f357a8 100%);
+            color: white;
+        }
+
+        .ai-result-item .download-btn {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+
+        .ai-result-item .use-image-btn:hover {
+            transform: scale(1.05);
+        }
+
+        .ai-result-item .download-btn:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .ai-loading {
+            text-align: center;
+            padding: 40px;
+            color: #fff;
+        }
+
+        .ai-loading i {
+            font-size: 2rem;
+            color: #7b2ff2;
+            margin-bottom: 15px;
+        }
+
+        .ai-loading p {
+            font-size: 1.1rem;
+            margin: 0;
+        }
+
+        /* On-Chain NFT Button Styles */
+        .onchain-btn {
+            background: linear-gradient(90deg, #e302f7 0%, #b90c9f 100%) !important;
+            margin-top: 10px;
+            font-size: 0.9rem;
+            padding: 8px 16px;
+        }
+
+        .onchain-btn:hover {
+            background: linear-gradient(90deg, #b90c9f 0%, #e302f7 100%) !important;
+            transform: translateY(-2px);
+        }
+
+        .onchain-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .tool.disabled, .control-btn.disabled {
+            opacity: 0.4;
+            pointer-events: none;
+            filter: grayscale(1);
+        }
+        .onchain-toggle-label input[type="checkbox"] {
+            accent-color: #e302f7;
+        }
     </style>
 </head>
 <body>
@@ -292,6 +599,12 @@
                 <h1>Magical Board</h1>
             </div>
             <div class="wallet-section">
+                <div style="display: flex; align-items: center; gap: 10px; margin-right: 18px;">
+                    <button id="onChainModeToggle" class="simple-toggle" aria-pressed="false" type="button">
+                        <span class="simple-toggle-knob"></span>
+                    </button>
+                    <span class="simple-toggle-label">On-Chain Mode</span>
+                </div>
                 <button id="connectWallet" class="connect-wallet-btn">
                     <i class="fas fa-wallet"></i>
                     <span>Connect Wallet</span>
@@ -372,6 +685,9 @@
                     <button id="mintNFT" class="mint-btn" disabled title="Mint as NFT">
                         <i class="fas fa-magic"> Mint as NFT</i>
                     </button>
+                    <button id="mintOnChainNFT" class="mint-btn onchain-btn" disabled title="Mint as On-Chain NFT">
+                        <i class="fas fa-link"> Mint On-Chain</i>
+                    </button>
                 </div>
             </div>
             <!-- Controls sidebar -->
@@ -390,6 +706,9 @@
                     </button>
                     <button id="uploadGif" class="control-btn" title="Upload GIF">
                         <i class="fas fa-film"></i>
+                    </button>
+                    <button id="aiGenerate" class="control-btn" title="AI Generate Image">
+                        <i class="fas fa-robot"></i>
                     </button>
                     <button id="emojiPicker" class="control-btn" title="Add Emoji">
                         <i class="far fa-smile"></i>
@@ -430,10 +749,76 @@
                 <div class="emoji-grid"></div>
             </div>
         </div>
+
+        <!-- AI Generation Modal -->
+        <div id="aiModal" class="ai-modal" style="display: none;">
+            <div class="ai-modal-content">
+                <div class="ai-modal-header">
+                    <h2><i class="fas fa-robot"></i> AI Image Generation</h2>
+                    <button id="closeAiModal" class="close-btn">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="ai-modal-body">
+                    <div class="ai-input-section">
+                        <label for="aiPrompt">Describe the image you want to generate:</label>
+                        <textarea id="aiPrompt" placeholder="Enter a detailed description of the image you want to create..." rows="4"></textarea>
+                        
+                        <div class="ai-options">
+                            <div class="ai-option-group">
+                                <label for="aiModel">Model:</label>
+                                <select id="aiModel">
+                                    <option value="stable-diffusion-xl-1024-v1-0">SDXL 1.0 (Default)</option>
+                                    <option value="stable-diffusion-v1-6">SD 1.6</option>
+                                    <option value="stable-diffusion-512-v2-1">SD 2.1 (512px)</option>
+                                    <option value="stable-diffusion-768-v2-1">SD 2.1 (768px)</option>
+                                    <option value="stable-diffusion-xl-beta-v2-2-2">SDXL Beta 2.2.2</option>
+                                </select>
+                            </div>
+                            
+                            <div class="ai-option-group">
+                                <label for="aiSize">Size:</label>
+                                <select id="aiSize">
+                                    <option value="1024x1024">1024x1024 (Square)</option>
+                                    <option value="1024x768">1024x768 (Landscape)</option>
+                                    <option value="768x1024">768x1024 (Portrait)</option>
+                                    <option value="512x512">512x512 (Small Square)</option>
+                                </select>
+                            </div>
+                            
+                            <div class="ai-option-group">
+                                <label for="aiSteps">Quality:</label>
+                                <select id="aiSteps">
+                                    <option value="20">High Quality (20 steps)</option>
+                                    <option value="15">Medium Quality (15 steps)</option>
+                                    <option value="10">Fast (10 steps)</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <button id="generateImage" class="generate-btn">
+                            <i class="fas fa-magic"></i> Generate Image
+                        </button>
+                    </div>
+                    
+                    <div class="ai-results-section" style="display: none;">
+                        <h3>Generated Images</h3>
+                        <div id="aiResults" class="ai-results-grid"></div>
+                        <div class="ai-loading" style="display: none;">
+                            <i class="fas fa-spinner fa-spin"></i>
+                            <p>Generating your image...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
+    <script src="config.js"></script>
     <script src="script.js"></script>
     <script src="nftMinter.js"></script>
+    <script src="aiGenerator.js"></script>
+    <script src="onChainMinter.js"></script>
     <script>
         // Monad Testnet details
         const MONAD_CHAIN_ID = '0x279f'; // 10143 in hex
@@ -545,6 +930,19 @@
                         const contractAddress = '0xC71d614c27A3B01890412d252138C5A1bFE69791';
                         // Connect whiteboard to NFT minter
                         connectToNFTMinter(whiteboard, contractAddress, window.web3);
+                        
+                        // Initialize on-chain minter if contract address is configured
+                        const onChainContractAddress = window.CONFIG?.MONAD?.ONCHAIN_CONTRACT_ADDRESS;
+                        if (onChainContractAddress) {
+                            window.onChainMinter = new OnChainMinter();
+                            window.onChainMinter.initialize(window.web3, onChainContractAddress);
+                            console.log('On-chain minter initialized');
+                            
+                            // Enable on-chain mint button
+                            const onChainMintBtn = document.getElementById('mintOnChainNFT');
+                            if (onChainMintBtn) onChainMintBtn.disabled = false;
+                        }
+                        
                         showNotification('Wallet connected to Monad Testnet!', 'success');
                     } catch (error) {
                         console.error('Error initializing Web3:', error);

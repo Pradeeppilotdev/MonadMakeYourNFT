@@ -92,6 +92,20 @@ class Whiteboard {
 
         // In constructor
         this.lastDot = null;
+        this.actions = [];
+        this.currentHistoryIndex = -1;
+        // Only load from localStorage on first page load
+        if (!window._whiteboardLoadedOnce) {
+            const savedActions = localStorage.getItem('whiteboardActions');
+            if (savedActions) {
+                try {
+                    this.actions = JSON.parse(savedActions);
+                } catch (e) {
+                    this.actions = [];
+                }
+            }
+            window._whiteboardLoadedOnce = true;
+        }
     }
 
     setupCanvas() {
@@ -237,6 +251,7 @@ class Whiteboard {
             this.isDragging = false;
             this.isCropping = false;
             this.lastDot = null;
+            this.currentAction = null;
             // Do NOT clear selectedElement; keep it for further edits
         });
 
@@ -357,6 +372,10 @@ class Whiteboard {
                 // Clear elements (images, emojis, text, etc.)
                 this.elements = [];
 
+                // Clear actions (for SVG export)
+                this.actions = [];
+                localStorage.removeItem('whiteboardActions');
+
                 // Optionally, reset history
                 this.history = [];
                 this.currentHistoryIndex = -1;
@@ -388,6 +407,15 @@ class Whiteboard {
                 const x = e.clientX - rect.left;
                 const y = e.clientY - rect.top;
                 this.addText(x, y);
+            }
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            // Ctrl+Shift+S to show SVG size info
+            if (e.ctrlKey && e.shiftKey && e.key === 'S') {
+                e.preventDefault();
+                this.showSVGSizeInfo();
             }
         });
     }
@@ -670,6 +698,18 @@ class Whiteboard {
         this.drawingCtx.lineWidth = this.size;
         this.drawingCtx.stroke();
         this.redrawCanvas();
+
+        if (!this.currentAction) {
+            this.currentAction = {
+                type: 'pencil',
+                color: this.color,
+                size: this.size,
+                points: [{x: this.lastX, y: this.lastY}]
+            };
+            this.actions.push(this.currentAction);
+        }
+        this.currentAction.points.push({x, y});
+        this.saveActionsToStorage();
     }
 
     drawBrush(x, y) {
@@ -934,8 +974,10 @@ class Whiteboard {
         this.history.push({
             elements: serializedElements,
             drawingCanvas: this.drawingCanvas.toDataURL(),
-            selectedIndex
+            selectedIndex,
+            actions: JSON.parse(JSON.stringify(this.actions))
         });
+        this.currentHistoryIndex++;
     }
 
     undo() {
@@ -961,6 +1003,8 @@ class Whiteboard {
                 this.redrawCanvas();
             };
             img.src = state.drawingCanvas;
+            this.actions = JSON.parse(JSON.stringify(state.actions));
+            this.saveActionsToStorage();
         }
     }
 
@@ -987,6 +1031,8 @@ class Whiteboard {
                 this.redrawCanvas();
             };
             img.src = state.drawingCanvas;
+            this.actions = JSON.parse(JSON.stringify(state.actions));
+            this.saveActionsToStorage();
         }
     }
 
@@ -1104,72 +1150,168 @@ class Whiteboard {
 
     setupNFTMinting() {
         const mintBtn = document.getElementById('mintNFT');
+        const onChainMintBtn = document.getElementById('mintOnChainNFT');
+        const testMinimalSVGBtn = document.getElementById('testMinimalSVG');
+        
         if (mintBtn) {
-            mintBtn.addEventListener('click', async () => {
-                if (!window.ethereum || !window.web3) {
-                    showNotification('Please connect your wallet first!', 'warning');
-                    return;
-                }
-
-                // Check if NFT minter is set
-                if (!this.nftMinter) {
-                    showNotification('Whooossssshhh!!! Kaboooommmm!! Gmalakaaa!! Gmonadddd!! Heres your NFT', 'error');
-                    return;
-                }
-
-                // Always show confirmation before minting
-                showConfirmation('Are you sure you want to mint this NFT?', async () => {
-                    await this._mintNFTFlow(mintBtn);
-                });
-            });
+            mintBtn.addEventListener('click', () => this._mintNFTFlow(mintBtn));
+        }
+        
+        if (onChainMintBtn) {
+            onChainMintBtn.addEventListener('click', () => this._mintOnChainNFTFlow(onChainMintBtn));
+        }
+        
+        if (testMinimalSVGBtn) {
+            testMinimalSVGBtn.addEventListener('click', () => this.testMinimalSVGMinting());
         }
     }
 
     async _mintNFTFlow(mintBtn) {
-        try {
-            // Show loading state
-            mintBtn.disabled = true;
-            mintBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Minting...';
-
-            // Get the current canvas state
-            const imageData = this.canvas.toDataURL('image/png');
-            
-            // Get current account
-            const accounts = await window.web3.eth.getAccounts();
-            if (!accounts || accounts.length === 0) {
-                throw new Error('No wallet connected');
-            }
-            
-            // Mint the NFT
-            const result = await this.nftMinter.mintNFT(imageData, accounts[0]);
-            
-            // Show success message
-            showNotification(`NFT minted successfully!<br>Transaction Hash: <a href='https://testnet.monadexplorer.com/tx/${result.transactionHash}' target='_blank' style='color:#fff;text-decoration:underline;'>${result.transactionHash.slice(0, 10)}...</a>`, 'success', 7000);
-            
-            // Refresh the NFT display
-            await this.initializeNFTDisplay();
-            
-            console.log('Minting successful:', result);
-        } catch (error) {
-            console.error('Error minting NFT:', error);
-            showNotification(`Failed to mint NFT: ${error.message}`, 'error', 7000);
-        } finally {
-            // Reset button state
-            mintBtn.disabled = false;
-            mintBtn.innerHTML = '<i class="fas fa-magic"></i> Mint as NFT';
+        if (!window.ethereum || !window.web3) {
+            showNotification('Please connect your wallet first!', 'warning');
+            return;
         }
+
+        // Check if NFT minter is set
+        if (!this.nftMinter) {
+            showNotification('Whooossssshhh!!! Kaboooommmm!! Gmalakaaa!! Gmonadddd!! Heres your NFT', 'error');
+            return;
+        }
+
+        // Always show confirmation before minting
+        showConfirmation('Are you sure you want to mint this NFT?', async () => {
+            try {
+                mintBtn.disabled = true;
+                mintBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Minting...';
+
+                // Get the canvas data
+                const canvas = this.canvas;
+                const imageData = canvas.toDataURL('image/png');
+
+                // Get the user's wallet address
+                const accounts = await window.web3.eth.getAccounts();
+                const account = accounts[0];
+
+                // Mint the NFT
+                const result = await this.nftMinter.mintNFT(imageData, account);
+
+                showNotification('NFT minted successfully! 🎉', 'success');
+                console.log('NFT minted:', result);
+
+                // Refresh NFT display
+                await this.initializeNFTDisplay();
+
+            } catch (error) {
+                console.error('Error minting NFT:', error);
+                showNotification('Failed to mint NFT: ' + error.message, 'error');
+            } finally {
+                mintBtn.disabled = false;
+                mintBtn.innerHTML = '<i class="fas fa-magic"> Mint as NFT</i>';
+            }
+        });
+    }
+
+    async _mintOnChainNFTFlow(onChainMintBtn) {
+        if (!window.ethereum || !window.web3) {
+            showNotification('Please connect your wallet first!', 'warning');
+            return;
+        }
+
+        // Check if on-chain minter is set
+        if (!window.onChainMinter) {
+            showNotification('On-chain contract not configured. Please set the contract address in config.js', 'warning');
+            return;
+        }
+
+        // Check SVG size before minting
+        const svgInfo = window.onChainMinter.getSVGSizeInfo();
+        if (svgInfo.error) {
+            showNotification('Error checking SVG size: ' + svgInfo.error, 'error');
+            return;
+        }
+
+        // Show SVG size info
+        let sizeMessage = `SVG Size: ${svgInfo.size} characters (${svgInfo.percentage}% of limit)\n${svgInfo.recommendation}`;
+        
+        if (svgInfo.isTooLarge) {
+            showNotification(`SVG too large! ${sizeMessage}`, 'error');
+            return;
+        }
+
+        if (svgInfo.isLarge) {
+            const proceed = confirm(`${sizeMessage}\n\nThis may result in high gas costs. Continue?`);
+            if (!proceed) return;
+        }
+
+        // Show confirmation before minting
+        showConfirmation(`Are you sure you want to mint this as an ON-CHAIN NFT?\n\nSVG Size: ${svgInfo.size} characters\n${svgInfo.recommendation}\n\nThis will store the image data directly in the smart contract.`, async () => {
+            try {
+                onChainMintBtn.disabled = true;
+                onChainMintBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Minting On-Chain...';
+
+                // Get the canvas
+                const canvas = this.canvas;
+
+                // Mint the on-chain NFT
+                const result = await window.onChainMinter.mintOnChainNFT(
+                    canvas, 
+                    'On-Chain SVG Art', 
+                    'Fully on-chain SVG NFT created with Magical Board'
+                );
+
+                showNotification('On-chain NFT minted successfully! 🎉 (Image stored in smart contract)', 'success');
+                console.log('On-chain NFT minted:', result);
+
+            } catch (error) {
+                console.error('Error minting on-chain NFT:', error);
+                showNotification('Failed to mint on-chain NFT: ' + error.message, 'error');
+            } finally {
+                onChainMintBtn.disabled = false;
+                onChainMintBtn.innerHTML = '<i class="fas fa-link"> Mint On-Chain</i>';
+            }
+        });
+    }
+
+    /**
+     * Test minimal SVG minting to verify contract functionality
+     */
+    async testMinimalSVGMinting() {
+        if (!window.ethereum || !window.web3) {
+            showNotification('Please connect your wallet first!', 'warning');
+            return;
+        }
+
+        if (!window.onChainMinter) {
+            showNotification('On-chain contract not configured. Please set the contract address in config.js', 'warning');
+            return;
+        }
+
+        showConfirmation('Test minting with a minimal SVG to verify contract functionality?\n\nThis will mint a simple test NFT with a basic SVG.', async () => {
+            try {
+                const result = await window.onChainMinter.testMinimalSVGMinting();
+                showNotification('✅ Minimal SVG test successful! Contract is working correctly.', 'success');
+                console.log('Minimal SVG test result:', result);
+            } catch (error) {
+                console.error('Minimal SVG test failed:', error);
+                showNotification('❌ Minimal SVG test failed: ' + error.message, 'error');
+            }
+        });
     }
 
     setNFTMinter(minter) {
         this.nftMinter = minter;
+        window.isWalletConnected = true;
+        // Enable mint buttons when wallet is connected
         const mintBtn = document.getElementById('mintNFT');
-        if (mintBtn) {
-            mintBtn.disabled = !minter;
+        const onChainMintBtn = document.getElementById('mintOnChainNFT');
+        const toggleBtn = document.getElementById('onChainModeToggle');
+        if (mintBtn) mintBtn.disabled = false;
+        // Only enable Mint On-Chain if wallet is connected AND toggle is ON
+        if (onChainMintBtn && toggleBtn) {
+            const isOn = toggleBtn.getAttribute('aria-pressed') === 'true';
+            onChainMintBtn.disabled = !(window.isWalletConnected && isOn);
         }
-        // Initialize NFT display when minter is set
-        if (minter) {
-            this.initializeNFTDisplay();
-        }
+        console.log('NFT Minter set:', minter);
     }
 
     async initializeNFTDisplay() {
@@ -1287,6 +1429,46 @@ class Whiteboard {
         reader.readAsDataURL(file);
     }
 
+    addAIGeneratedImage(img, prompt) {
+        // Calculate appropriate size for the AI generated image
+        const maxWidth = this.canvas.width * 0.8;
+        const maxHeight = this.canvas.height * 0.8;
+        
+        let width = img.width;
+        let height = img.height;
+        
+        // Scale down if too large
+        if (width > maxWidth || height > maxHeight) {
+            const scale = Math.min(maxWidth / width, maxHeight / height);
+            width *= scale;
+            height *= scale;
+        }
+        
+        // Center the image on canvas
+        const x = (this.canvas.width - width) / 2;
+        const y = (this.canvas.height - height) / 2;
+        
+        const element = {
+            type: 'image',
+            content: img,
+            x: x,
+            y: y,
+            width: width,
+            height: height,
+            rotation: 0,
+            scale: 1,
+            isAIGenerated: true,
+            prompt: prompt
+        };
+        
+        this.elements.push(element);
+        this.redrawCanvas();
+        this.saveState();
+        
+        // Show notification
+        showNotification('AI generated image added to canvas!', 'success');
+    }
+
     addText(x, y) {
         const element = {
             type: 'text',
@@ -1313,11 +1495,145 @@ class Whiteboard {
             this.textContent = '';
         }
     }
+
+    /**
+     * Export the current whiteboard as a highly optimized SVG (vector)
+     */
+    exportAsSVG() {
+        const width = +this.canvas.width;
+        const height = +this.canvas.height;
+        let svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}">`;
+        svg += `<rect width="100%" height="100%" fill="white"/>`;
+        for (const action of this.actions) {
+            if ((action.type === 'pencil' || action.type === 'brush') && action.points.length >= 2) {
+                // Limit decimals for all points
+                const d = action.points.map((pt, i) =>
+                    (i === 0
+                        ? `M${pt.x.toFixed(1)},${pt.y.toFixed(1)}`
+                        : `L${pt.x.toFixed(1)},${pt.y.toFixed(1)}`)
+                ).join('');
+                svg += `<path d="${d}" stroke="${action.color}" stroke-width="${Number(action.size).toFixed(1)}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+            }
+            if (action.type === 'text' && action.content) {
+                svg += `<text x="${Number(action.x).toFixed(1)}" y="${Number(action.y).toFixed(1)}" font-family="${action.fontFamily || 'Arial'}" font-size="${Number(action.fontSize || 24).toFixed(1)}" fill="${action.color || '#000'}">${action.content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</text>`;
+            }
+            // Add more types as needed (eraser, shapes, etc.)
+        }
+        svg += '</svg>';
+        // Remove all unnecessary whitespace and newlines
+        svg = svg.replace(/\s{2,}/g, ' ').replace(/\n/g, '').replace(/>\s+</g, '><').trim();
+        return svg;
+    }
+
+    // Save actions to localStorage
+    saveActionsToStorage() {
+        localStorage.setItem('whiteboardActions', JSON.stringify(this.actions));
+    }
+
+    setupOnChainModeToggle() {
+        const toggleBtn = document.getElementById('onChainModeToggle');
+        const onChainMintBtn = document.getElementById('mintOnChainNFT');
+        const toolIds = ['pencil', 'brush', 'spray', 'eraser', 'text', 'blur', 'smudge', 'dotted', 'crop', 'resize'];
+        const controlIds = ['uploadImage', 'uploadGif', 'emojiPicker', 'savePNG', 'saveJPG', 'clear', 'undo', 'redo'];
+        const colorPicker = document.getElementById('colorPicker');
+        const sizeSlider = document.getElementById('sizeSlider');
+        const infoId = 'onChainInfoMsg';
+
+        function setOnChainMode(enabled) {
+            // Only pencil and color picker enabled
+            toolIds.forEach(id => {
+                const btn = document.getElementById(id);
+                if (btn) {
+                    if (id === 'pencil') btn.classList.remove('disabled');
+                    else btn.classList.add('disabled');
+                }
+            });
+            controlIds.forEach(id => {
+                const btn = document.getElementById(id);
+                if (btn) {
+                    // Allow clear/undo/redo
+                    if (['clear', 'undo', 'redo'].includes(id)) btn.classList.remove('disabled');
+                    else btn.classList.add('disabled');
+                }
+            });
+            if (colorPicker) colorPicker.disabled = !enabled;
+            if (sizeSlider) sizeSlider.disabled = !enabled;
+            // Enable/disable Mint On-Chain button: only if wallet is connected and toggle is ON
+            if (onChainMintBtn) onChainMintBtn.disabled = !(window.isWalletConnected && enabled);
+            // Disable AI Generate Image button in On-Chain Mode
+            const aiGenBtn = document.getElementById('aiGenerate');
+            if (aiGenBtn) aiGenBtn.disabled = !!enabled;
+            // Show info message
+            let info = document.getElementById(infoId);
+            if (enabled) {
+                if (!info) {
+                    info = document.createElement('div');
+                    info.id = infoId;
+                    info.style = 'color:#e302f7;font-weight:600;text-align:center;margin:10px 0;';
+                    info.innerText = 'On-Chain Mode: Only pencil and color are enabled for gas-efficient SVG NFTs.';
+                    document.querySelector('.app-header').appendChild(info);
+                }
+            } else {
+                if (info) info.remove();
+                // Re-enable all tools/controls
+                toolIds.forEach(id => {
+                    const btn = document.getElementById(id);
+                    if (btn) btn.classList.remove('disabled');
+                });
+                controlIds.forEach(id => {
+                    const btn = document.getElementById(id);
+                    if (btn) btn.classList.remove('disabled');
+                });
+                if (colorPicker) colorPicker.disabled = false;
+                if (sizeSlider) sizeSlider.disabled = false;
+                // Re-enable AI Generate Image button
+                const aiGenBtn = document.getElementById('aiGenerate');
+                if (aiGenBtn) aiGenBtn.disabled = false;
+            }
+        }
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', () => {
+                const isOn = toggleBtn.getAttribute('aria-pressed') === 'true';
+                toggleBtn.setAttribute('aria-pressed', (!isOn).toString());
+                setOnChainMode(!isOn);
+            });
+            // Set initial state
+            setOnChainMode(toggleBtn.getAttribute('aria-pressed') === 'true');
+        }
+    }
+
+    /**
+     * Display current SVG size information for debugging
+     */
+    showSVGSizeInfo() {
+        if (!window.onChainMinter) {
+            console.log('On-chain minter not initialized');
+            return;
+        }
+        
+        const svgInfo = window.onChainMinter.getSVGSizeInfo();
+        if (svgInfo.error) {
+            console.error('Error getting SVG size:', svgInfo.error);
+            return;
+        }
+        
+        console.log('=== SVG Size Information ===');
+        console.log(`Size: ${svgInfo.size} characters`);
+        console.log(`Max allowed: ${svgInfo.maxSize} characters`);
+        console.log(`Percentage of limit: ${svgInfo.percentage}%`);
+        console.log(`Status: ${svgInfo.isTooLarge ? 'TOO LARGE' : svgInfo.isLarge ? 'LARGE (warning)' : 'GOOD'}`);
+        console.log(`Recommendation: ${svgInfo.recommendation}`);
+        console.log('===========================');
+        
+        // Also show in notification
+        showNotification(`SVG Size: ${svgInfo.size} chars (${svgInfo.percentage}% of limit)`, svgInfo.isTooLarge ? 'error' : svgInfo.isLarge ? 'warning' : 'success');
+    }
 }
 
 // Initialize the whiteboard when the page loads
 window.addEventListener('load', () => {
     window.whiteboard = new Whiteboard();
+    window.whiteboard.setupOnChainModeToggle();
 });
 
 // Notification function
@@ -1379,4 +1695,4 @@ function showConfirmation(message, onYes, onNo) {
         notification.remove();
         if (onNo) onNo();
     };
-} 
+}
