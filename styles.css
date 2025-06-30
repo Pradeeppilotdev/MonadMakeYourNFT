@@ -488,4 +488,54 @@ input[type="range"]::-webkit-slider-thumb:hover {
   font-size: 1rem;
   letter-spacing: 0.01em;
   user-select: none;
+}
+
+/* Add styles for pixelated board mode */
+.pixelated-mode-active {
+    cursor: crosshair !important;
+}
+
+.pixelated-mode-active canvas {
+    cursor: crosshair !important;
+}
+
+#pixelColorPicker {
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.pixel-color-btn {
+    transition: transform 0.1s ease;
+}
+
+.pixel-color-btn:hover {
+    transform: scale(1.1);
+}
+
+.pixel-color-btn.selected {
+    border: 2px solid #7b2ff2 !important;
+    box-shadow: 0 0 8px rgba(123, 47, 242, 0.3);
+}
+
+/* Grid lines for pixelated board */
+.pixel-grid-lines {
+    stroke: #E0E0E0;
+    stroke-width: 1;
+    fill: none;
+}
+
+/* Pixel hover effect */
+.pixel-hover {
+    opacity: 0.7;
+    transition: opacity 0.1s ease;
 } 

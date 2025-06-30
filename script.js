@@ -81,6 +81,38 @@ class Whiteboard {
         this.lastClickTime = 0;
         this.doubleClickThreshold = 300;
 
+        // Add pixelated board properties
+        this.isPixelatedMode = false;
+        this.pixelSize = 20; // Size of each pixel
+        this.pixelGrid = []; // 2D array to store pixel colors
+        this.pixelCanvas = document.createElement('canvas');
+        this.pixelCtx = this.pixelCanvas.getContext('2d');
+        this.pixelColors = [
+            // Primary Colors
+            '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF',
+            
+            // Secondary Colors
+            '#FF8000', '#8000FF', '#0080FF', '#FF0080', '#80FF00', '#00FF80',
+            
+            // Warm Colors
+            '#FF4000', '#FF6000', '#FFA000', '#FFC000', '#FFE000', '#FFFF40',
+            
+            // Cool Colors
+            '#0040FF', '#0060FF', '#0080FF', '#00A0FF', '#00C0FF', '#00E0FF',
+            
+            // Pastels
+            '#FFB3B3', '#B3FFB3', '#B3B3FF', '#FFFFB3', '#FFB3FF', '#B3FFFF',
+            
+            // Earth Tones
+            '#8B4513', '#A0522D', '#CD853F', '#DEB887', '#F5DEB3', '#F5F5DC',
+            
+            // Grayscale
+            '#FFFFFF', '#F0F0F0', '#E0E0E0', '#D0D0D0', '#C0C0C0', '#B0B0B0',
+            '#A0A0A0', '#909090', '#808080', '#707070', '#606060', '#505050',
+            '#404040', '#303030', '#202020', '#101010', '#000000'
+        ];
+        this.selectedPixelColor = '#FF0000';
+
         // Initialize the canvas and tools
         this.setupCanvas();
         this.setupTools();
@@ -110,6 +142,10 @@ class Whiteboard {
         if (this.history.length === 0) {
             this.saveState();
         }
+
+        // Add to constructor
+        this.isEyedropperActive = false;
+        this.lastHoveredPixel = null;
     }
 
     setupCanvas() {
@@ -125,6 +161,10 @@ class Whiteboard {
         this.imageCanvas.width = this.canvas.width;
         this.imageCanvas.height = this.canvas.height;
         
+        // Set pixel canvas dimensions
+        this.pixelCanvas.width = this.canvas.width;
+        this.pixelCanvas.height = this.canvas.height;
+        
         // Fill drawing canvas with white
         this.drawingCtx.fillStyle = 'white';
         this.drawingCtx.fillRect(0, 0, this.drawingCanvas.width, this.drawingCanvas.height);
@@ -133,7 +173,586 @@ class Whiteboard {
         this.drawingCtx.lineCap = 'round';
         this.drawingCtx.lineJoin = 'round';
         
+        // Initialize pixel grid
+        this.initializePixelGrid();
+        
         this.redrawCanvas();
+    }
+
+    // Initialize pixel grid
+    initializePixelGrid() {
+        const cols = Math.ceil(this.canvas.width / this.pixelSize);
+        const rows = Math.ceil(this.canvas.height / this.pixelSize);
+        
+        this.pixelGrid = [];
+        for (let row = 0; row < rows; row++) {
+            this.pixelGrid[row] = [];
+            for (let col = 0; col < cols; col++) {
+                this.pixelGrid[row][col] = '#FFFFFF'; // White by default
+            }
+        }
+    }
+
+    // Switch to pixelated mode
+    enablePixelatedMode() {
+        this.isPixelatedMode = true;
+        this.canvas.classList.add('pixelated-mode-active');
+        this.drawPixelGrid();
+        this.setupPixelColorPicker();
+        this.redrawCanvas();
+    }
+
+    // Switch back to whiteboard mode
+    disablePixelatedMode() {
+        this.isPixelatedMode = false;
+        this.canvas.classList.remove('pixelated-mode-active');
+        this.removePixelColorPicker();
+        this.redrawCanvas();
+    }
+
+    // Draw the pixel grid
+    drawPixelGrid() {
+        this.pixelCtx.clearRect(0, 0, this.pixelCanvas.width, this.pixelCanvas.height);
+        
+        const cols = this.pixelGrid[0].length;
+        const rows = this.pixelGrid.length;
+        
+        // Draw each pixel
+        for (let row = 0; row < rows; row++) {
+            for (let col = 0; col < cols; col++) {
+                const x = col * this.pixelSize;
+                const y = row * this.pixelSize;
+                const color = this.pixelGrid[row][col];
+                
+                this.pixelCtx.fillStyle = color;
+                this.pixelCtx.fillRect(x, y, this.pixelSize, this.pixelSize);
+                
+                // Draw grid lines
+                this.pixelCtx.strokeStyle = '#E0E0E0';
+                this.pixelCtx.lineWidth = 1;
+                this.pixelCtx.strokeRect(x, y, this.pixelSize, this.pixelSize);
+            }
+        }
+
+        if (this.lastHoveredPixel) {
+            const { row, col } = this.lastHoveredPixel;
+            if (row >= 0 && row < rows && col >= 0 && col < cols) {
+                const hoverX = col * this.pixelSize;
+                const hoverY = row * this.pixelSize;
+                this.pixelCtx.fillStyle = this.selectedPixelColor;
+                this.pixelCtx.globalAlpha = 0.5;
+                this.pixelCtx.fillRect(hoverX, hoverY, this.pixelSize, this.pixelSize);
+                this.pixelCtx.globalAlpha = 1.0;
+                this.pixelCtx.strokeStyle = '#7b2ff2';
+                this.pixelCtx.lineWidth = 2;
+                this.pixelCtx.strokeRect(hoverX, hoverY, this.pixelSize, this.pixelSize);
+            }
+        }
+    }
+
+    // Handle pixel clicking
+    handlePixelClick(x, y) {
+        if (!this.isPixelatedMode) return;
+        
+        const col = Math.floor(x / this.pixelSize);
+        const row = Math.floor(y / this.pixelSize);
+        
+        if (row >= 0 && row < this.pixelGrid.length && col >= 0 && col < this.pixelGrid[0].length) {
+            // Normal pixel coloring only (no eyedropper logic)
+            this.pixelGrid[row][col] = this.selectedPixelColor;
+            this.drawPixelGrid();
+            this.redrawCanvas();
+            this.saveState(); // Save state after each pixel change
+        }
+    }
+
+    // Handle pixel hover for visual feedback
+    handlePixelHover(x, y) {
+        if (!this.isPixelatedMode) return;
+        
+        const col = Math.floor(x / this.pixelSize);
+        const row = Math.floor(y / this.pixelSize);
+        
+        if (row >= 0 && row < this.pixelGrid.length && col >= 0 && col < this.pixelGrid[0].length) {
+            this.lastHoveredPixel = { row, col };
+        } else {
+            this.lastHoveredPixel = null;
+        }
+        this.drawPixelGrid();
+        this.redrawCanvas();
+    }
+
+    // Setup pixel color picker UI
+    setupPixelColorPicker() {
+        // Remove existing color picker if any
+        this.removePixelColorPicker();
+        
+        // Create color picker container
+        const colorPickerContainer = document.createElement('div');
+        colorPickerContainer.id = 'pixelColorPicker';
+        colorPickerContainer.style.cssText = `
+            position: fixed;
+            top: 100px;
+            right: 20px;
+            background: white;
+            border: 2px solid #7b2ff2;
+            border-radius: 12px;
+            padding: 15px 15px 15px 15px;
+            box-shadow: 0 4px 20px rgba(123,47,242,0.2);
+            z-index: 10000;
+            max-width: 600px;
+            min-width: 180px;
+            min-height: 120px;
+            width: 280px;
+            height: 420px;
+            max-height: 80vh;
+            overflow-y: auto;
+            cursor: grab;
+            resize: none;
+            box-sizing: border-box;
+        `;
+        colorPickerContainer.setAttribute('draggable', 'false');
+
+        // --- STATIC RESIZE HANDLES (STICKY) ---
+        // Bottom-right handle
+        const resizeHandleBR = document.createElement('div');
+        resizeHandleBR.style.cssText = `
+            position: sticky;
+            float: right;
+            right: 0;
+            bottom: 0;
+            width: 24px;
+            height: 24px;
+            cursor: se-resize;
+            z-index: 10002;
+            background: #f8f8ff;
+            border-radius: 0 0 12px 0;
+            display: flex;
+            align-items: flex-end;
+            justify-content: flex-end;
+            border-top: 1px solid #eee;
+            border-left: 1px solid #eee;
+        `;
+        // resizeHandleBR.innerHTML = `<svg width="18" height="18" style="opacity:0.5;" viewBox="0 0 18 18"><path d="M3 15h12M6 12h9M9 9h6" stroke="#7b2ff2" stroke-width="2"/></svg>`;
+        // colorPickerContainer.appendChild(resizeHandleBR);
+
+        // Top-left handle
+        const resizeHandleTL = document.createElement('div');
+        resizeHandleTL.style.cssText = `
+            position: sticky;
+            float: left;
+            left: 0;
+            top: 0;
+            width: 24px;
+            height: 24px;
+            cursor: nw-resize;
+            z-index: 10002;
+            background: #f8f8ff;
+            border-radius: 12px 0 0 0;
+            display: flex;
+            align-items: flex-start;
+            justify-content: flex-start;
+            border-bottom: 1px solid #eee;
+            border-right: 1px solid #eee;
+        `;
+        resizeHandleTL.innerHTML = `<svg width="18" height="18" style="opacity:0.5;transform:rotate(180deg);" viewBox="0 0 18 18"><path d="M3 15h12M6 12h9M9 9h6" stroke="#7b2ff2" stroke-width="2"/></svg>`;
+        colorPickerContainer.appendChild(resizeHandleTL);
+
+        // --- Resize logic for both handles ---
+        let isResizingBR = false, isResizingTL = false, startW = 0, startH = 0, startX = 0, startY = 0, startLeft = 0, startTop = 0;
+        resizeHandleBR.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            isResizingBR = true;
+            startW = colorPickerContainer.offsetWidth;
+            startH = colorPickerContainer.offsetHeight;
+            startX = e.clientX;
+            startY = e.clientY;
+            document.body.style.userSelect = 'none';
+        });
+        resizeHandleTL.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            isResizingTL = true;
+            startW = colorPickerContainer.offsetWidth;
+            startH = colorPickerContainer.offsetHeight;
+            startX = e.clientX;
+            startY = e.clientY;
+            // For moving the panel as we resize from top-left
+            const rect = colorPickerContainer.getBoundingClientRect();
+            startLeft = rect.left;
+            startTop = rect.top;
+        });
+        document.addEventListener('mousemove', (e) => {
+            if (isResizingBR) {
+                let newW = Math.max(180, Math.min(600, startW + (e.clientX - startX)));
+                let newH = Math.max(120, startH + (e.clientY - startY));
+                colorPickerContainer.style.width = newW + 'px';
+                colorPickerContainer.style.height = newH + 'px';
+            }
+            if (isResizingTL) {
+                let dx = e.clientX - startX;
+                let dy = e.clientY - startY;
+                let newW = Math.max(180, Math.min(600, startW - dx));
+                let newH = Math.max(120, startH - dy);
+                let newLeft = startLeft + dx;
+                let newTop = startTop + dy;
+                colorPickerContainer.style.width = newW + 'px';
+                colorPickerContainer.style.height = newH + 'px';
+                colorPickerContainer.style.left = newLeft + 'px';
+                colorPickerContainer.style.top = newTop + 'px';
+                colorPickerContainer.style.right = 'auto';
+            }
+        });
+        document.addEventListener('mouseup', () => {
+            if (isResizingBR || isResizingTL) {
+                isResizingBR = false;
+                isResizingTL = false;
+                document.body.style.userSelect = '';
+            }
+        });
+
+        // --- DRAGGABLE LOGIC ---
+        let isDragging = false, dragOffsetX = 0, dragOffsetY = 0;
+        colorPickerContainer.addEventListener('mousedown', (e) => {
+            // Only drag if not clicking on a button/input
+            if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'LABEL') return;
+            isDragging = true;
+            dragOffsetX = e.clientX - colorPickerContainer.getBoundingClientRect().left;
+            dragOffsetY = e.clientY - colorPickerContainer.getBoundingClientRect().top;
+            colorPickerContainer.style.cursor = 'grabbing';
+        });
+        document.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                let newLeft = e.clientX - dragOffsetX;
+                let newTop = e.clientY - dragOffsetY;
+                // Clamp to viewport
+                newLeft = Math.max(0, Math.min(window.innerWidth - colorPickerContainer.offsetWidth, newLeft));
+                newTop = Math.max(0, Math.min(window.innerHeight - 40, newTop));
+                colorPickerContainer.style.left = newLeft + 'px';
+                colorPickerContainer.style.top = newTop + 'px';
+                colorPickerContainer.style.right = 'auto';
+            }
+        });
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+            colorPickerContainer.style.cursor = 'grab';
+        });
+        // Set initial position
+        colorPickerContainer.style.left = '';
+        colorPickerContainer.style.top = '100px';
+        colorPickerContainer.style.right = '20px';
+
+        // --- MINIMIZE BUTTON ---
+        const minimizeBtn = document.createElement('button');
+        minimizeBtn.innerHTML = '<span style="font-size:18px;">&minus;</span>';
+        minimizeBtn.title = 'Minimize';
+        minimizeBtn.style.cssText = `
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 28px;
+            height: 28px;
+            background: #f0f0f0;
+            color: #7b2ff2;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: bold;
+            z-index: 10001;
+        `;
+        colorPickerContainer.appendChild(minimizeBtn);
+
+        // Minimized state
+        let minimized = false;
+        const minimizedBtn = document.createElement('button');
+        minimizedBtn.innerHTML = '<span style="font-size:20px;">🎨</span>';
+        minimizedBtn.title = 'Show Color Palette';
+        minimizedBtn.className = 'tool'; // Match sidebar tool style
+        minimizedBtn.style.cssText = `
+            display: none;
+            background: rgba(107, 70, 193, 0.1);
+            color: #7b2ff2;
+            border: 1px solid var(--monad-border);
+            padding: 0.75rem;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            transition: all 0.3s ease;
+            margin: 0.5rem 0;
+        `;
+        // Find the left sidebar
+        const toolsSidebar = document.querySelector('.tools-sidebar');
+        // Add to sidebar but hidden initially
+        if (toolsSidebar) toolsSidebar.appendChild(minimizedBtn);
+        minimizedBtn.style.display = 'none'; // Always hide on initial load
+
+        minimizeBtn.onclick = () => {
+            colorPickerContainer.style.display = 'none';
+            minimizedBtn.style.display = 'flex';
+            minimized = true;
+        };
+        minimizedBtn.onclick = () => {
+            colorPickerContainer.style.display = 'block';
+            minimizedBtn.style.display = 'none'; // Always hide when restoring
+            minimized = false;
+        };
+
+        // Add title
+        const title = document.createElement('h3');
+        title.textContent = 'Pixel Colors';
+        title.style.cssText = `
+            margin: 0 0 15px 0;
+            color: #7b2ff2;
+            font-size: 16px;
+            text-align: center;
+            font-weight: 600;
+        `;
+        colorPickerContainer.appendChild(title);
+        
+        // Create color grid with better organization
+        const colorGrid = document.createElement('div');
+        colorGrid.style.cssText = `
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 6px;
+            margin-bottom: 15px;
+        `;
+        
+        // Color categories for better organization
+        const colorCategories = [
+            { name: 'Primary', colors: this.pixelColors.slice(0, 6) },
+            { name: 'Secondary', colors: this.pixelColors.slice(6, 12) },
+            { name: 'Warm', colors: this.pixelColors.slice(12, 18) },
+            { name: 'Cool', colors: this.pixelColors.slice(18, 24) },
+            { name: 'Pastels', colors: this.pixelColors.slice(24, 30) },
+            { name: 'Earth', colors: this.pixelColors.slice(30, 36) },
+            { name: 'Grays', colors: this.pixelColors.slice(36) }
+        ];
+        
+        colorCategories.forEach(category => {
+            // Add category label
+            const categoryLabel = document.createElement('div');
+            categoryLabel.textContent = category.name;
+            categoryLabel.style.cssText = `
+                grid-column: 1 / -1;
+                font-size: 12px;
+                font-weight: 600;
+                color: #666;
+                margin-top: 10px;
+                margin-bottom: 5px;
+                text-align: left;
+                border-bottom: 1px solid #eee;
+                padding-bottom: 3px;
+            `;
+            colorGrid.appendChild(categoryLabel);
+            
+            // Add colors for this category
+            category.colors.forEach(color => {
+                const colorBtn = document.createElement('div');
+                colorBtn.className = 'pixel-color-btn';
+                colorBtn.style.cssText = `
+                    width: 24px;
+                    height: 24px;
+                    background-color: ${color};
+                    border: 2px solid ${color === this.selectedPixelColor ? '#7b2ff2' : '#ddd'};
+                    border-radius: 6px;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                `;
+                
+                colorBtn.onclick = () => {
+                    this.selectedPixelColor = color;
+                    // Update all color buttons
+                    colorGrid.querySelectorAll('.pixel-color-btn').forEach(btn => {
+                        btn.style.borderColor = '#ddd';
+                        btn.style.transform = 'scale(1)';
+                    });
+                    colorBtn.style.borderColor = '#7b2ff2';
+                    colorBtn.style.transform = 'scale(1.1)';
+                };
+                
+                colorBtn.onmouseenter = () => {
+                    if (color !== this.selectedPixelColor) {
+                        colorBtn.style.transform = 'scale(1.05)';
+                        colorBtn.style.boxShadow = '0 2px 6px rgba(0,0,0,0.2)';
+                    }
+                };
+                
+                colorBtn.onmouseleave = () => {
+                    if (color !== this.selectedPixelColor) {
+                        colorBtn.style.transform = 'scale(1)';
+                        colorBtn.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+                    }
+                };
+                
+                colorGrid.appendChild(colorBtn);
+            });
+        });
+        
+        colorPickerContainer.appendChild(colorGrid);
+        
+        // Add custom color picker
+        const customColorLabel = document.createElement('label');
+        customColorLabel.textContent = 'Custom Color:';
+        customColorLabel.style.cssText = `
+            display: block;
+            margin-bottom: 8px;
+            font-size: 13px;
+            color: #666;
+            font-weight: 600;
+        `;
+        colorPickerContainer.appendChild(customColorLabel);
+        
+        const customColorInput = document.createElement('input');
+        customColorInput.type = 'color';
+        customColorInput.value = this.selectedPixelColor;
+        customColorInput.style.cssText = `
+            width: 100%;
+            height: 35px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            cursor: pointer;
+            background: white;
+        `;
+        
+        customColorInput.onchange = (e) => {
+            this.selectedPixelColor = e.target.value;
+        };
+        
+        colorPickerContainer.appendChild(customColorInput);
+        
+        // Add pixel size indicator and controls
+        const pixelSizeLabel = document.createElement('label');
+        pixelSizeLabel.textContent = 'Pixel Size:';
+        pixelSizeLabel.style.cssText = `
+            display: block;
+            margin-top: 15px;
+            margin-bottom: 8px;
+            font-size: 13px;
+            color: #666;
+            font-weight: 600;
+        `;
+        colorPickerContainer.appendChild(pixelSizeLabel);
+        
+        const pixelSizeContainer = document.createElement('div');
+        pixelSizeContainer.style.cssText = `
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        `;
+        
+        const decreaseBtn = document.createElement('button');
+        decreaseBtn.textContent = '-';
+        decreaseBtn.style.cssText = `
+            width: 30px;
+            height: 30px;
+            background: #7b2ff2;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+        `;
+        
+        const pixelSizeDisplay = document.createElement('span');
+        pixelSizeDisplay.textContent = `${this.pixelSize}px`;
+        pixelSizeDisplay.style.cssText = `
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+            min-width: 50px;
+            text-align: center;
+        `;
+        
+        const increaseBtn = document.createElement('button');
+        increaseBtn.textContent = '+';
+        increaseBtn.style.cssText = `
+            width: 30px;
+            height: 30px;
+            background: #7b2ff2;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+        `;
+        
+        const updatePixelSize = (newSize) => {
+            this.pixelSize = newSize;
+            pixelSizeDisplay.textContent = `${this.pixelSize}px`;
+            this.initializePixelGrid();
+            this.drawPixelGrid();
+            this.redrawCanvas();
+        };
+        
+        decreaseBtn.onclick = () => {
+            const newSize = Math.max(8, this.pixelSize - 2);
+            updatePixelSize(newSize);
+        };
+        
+        increaseBtn.onclick = () => {
+            const newSize = Math.min(50, this.pixelSize + 2);
+            updatePixelSize(newSize);
+        };
+        
+        pixelSizeContainer.appendChild(decreaseBtn);
+        pixelSizeContainer.appendChild(pixelSizeDisplay);
+        pixelSizeContainer.appendChild(increaseBtn);
+        colorPickerContainer.appendChild(pixelSizeContainer);
+        
+        // Add mode toggle button
+        const toggleBtn = document.createElement('button');
+        toggleBtn.textContent = 'Switch to Whiteboard';
+        toggleBtn.style.cssText = `
+            width: 100%;
+            margin-top: 15px;
+            padding: 10px;
+            background: #7b2ff2;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: background 0.2s ease;
+        `;
+        
+        toggleBtn.onmouseenter = () => {
+            toggleBtn.style.background = '#6a1fb2';
+        };
+        
+        toggleBtn.onmouseleave = () => {
+            toggleBtn.style.background = '#7b2ff2';
+        };
+        
+        toggleBtn.onclick = () => {
+            this.disablePixelatedMode();
+        };
+        
+        colorPickerContainer.appendChild(toggleBtn);
+        
+        document.body.appendChild(colorPickerContainer);
+    }
+
+    // Remove pixel color picker
+    removePixelColorPicker() {
+        const existingPicker = document.getElementById('pixelColorPicker');
+        if (existingPicker) {
+            existingPicker.remove();
+        }
+        // Also hide minimized button if it exists (robust: check entire document)
+        document.querySelectorAll('button[title="Show Color Palette"]').forEach(btn => {
+            btn.style.display = 'none';
+        });
     }
 
     setupEventListeners() {
@@ -142,6 +761,12 @@ class Whiteboard {
             const rect = this.canvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
+
+            // Handle pixel clicking in pixelated mode
+            if (this.isPixelatedMode) {
+                this.handlePixelClick(x, y);
+                return;
+            }
 
             // Crop/Resize tool: always allow selecting an image or emoji, and clicking empty space deselects
             if (["crop", "resize"].includes(this.currentTool)) {
@@ -204,6 +829,12 @@ class Whiteboard {
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
 
+            // Handle pixel hover in pixelated mode
+            if (this.isPixelatedMode) {
+                this.handlePixelHover(x, y);
+                return;
+            }
+
             // Crop/Resize logic for images and emojis
             if ((this.isCropping || this.isDragging) && this.selectedElement && (this.selectedElement.type === 'image' || this.selectedElement.type === 'emoji')) {
                 if (this.isDragging) {
@@ -262,6 +893,9 @@ class Whiteboard {
         this.canvas.addEventListener('mouseleave', () => {
             this.isDrawing = false;
             this.isDragging = false;
+            this.lastHoveredPixel = null;
+            this.drawPixelGrid();
+            this.redrawCanvas();
         });
 
         // Touch events for mobile support
@@ -368,26 +1002,7 @@ class Whiteboard {
         const clearBtn = document.getElementById('clear');
         if (clearBtn) {
             clearBtn.addEventListener('click', () => {
-                // Clear the drawing canvas
-                this.drawingCtx.clearRect(0, 0, this.drawingCanvas.width, this.drawingCanvas.height);
-                this.drawingCtx.fillStyle = 'white';
-                this.drawingCtx.fillRect(0, 0, this.drawingCanvas.width, this.drawingCanvas.height);
-
-                // Clear elements (images, emojis, text, etc.)
-                this.elements = [];
-
-                // Clear actions (for SVG export)
-                this.actions = [];
-                localStorage.removeItem('whiteboardActions');
-
-                // Do NOT reset history, just push cleared state
-                // this.history = [];
-                // this.currentHistoryIndex = -1;
-
-                // Redraw the main canvas
-                this.redrawCanvas();
-                // Push cleared state to history for undo/redo
-                this.saveState();
+                this.clearCanvas();
             });
         }
 
@@ -417,10 +1032,60 @@ class Whiteboard {
 
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
+            // Ctrl+Z for undo
+            if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
+                e.preventDefault();
+                this.undo();
+            }
+            
+            // Ctrl+Shift+Z or Ctrl+Y for redo
+            if ((e.ctrlKey && e.shiftKey && e.key === 'Z') || (e.ctrlKey && e.key === 'y')) {
+                e.preventDefault();
+                this.redo();
+            }
+            
             // Ctrl+Shift+S to show SVG size info
             if (e.ctrlKey && e.shiftKey && e.key === 'S') {
                 e.preventDefault();
                 this.showSVGSizeInfo();
+            }
+            
+            // Pixel size adjustment in pixelated mode
+            if (this.isPixelatedMode) {
+                if (e.key === '+' || e.key === '=') {
+                    e.preventDefault();
+                    this.pixelSize = Math.min(50, this.pixelSize + 2);
+                    this.initializePixelGrid();
+                    this.drawPixelGrid();
+                    this.redrawCanvas();
+                } else if (e.key === '-') {
+                    e.preventDefault();
+                    this.pixelSize = Math.max(8, this.pixelSize - 2);
+                    this.initializePixelGrid();
+                    this.drawPixelGrid();
+                    this.redrawCanvas();
+                }
+            }
+        });
+
+        // Mouse wheel for pixel size adjustment in pixelated mode
+        this.canvas.addEventListener('wheel', (e) => {
+            if (this.isPixelatedMode) {
+                e.preventDefault();
+                const delta = e.deltaY > 0 ? -2 : 2;
+                const newSize = Math.max(8, Math.min(50, this.pixelSize + delta));
+                if (newSize !== this.pixelSize) {
+                    this.pixelSize = newSize;
+                    this.initializePixelGrid();
+                    this.drawPixelGrid();
+                    this.redrawCanvas();
+                    
+                    // Update pixel size display if color picker is open
+                    const pixelSizeDisplay = document.querySelector('#pixelColorPicker span');
+                    if (pixelSizeDisplay && pixelSizeDisplay.textContent.includes('px')) {
+                        pixelSizeDisplay.textContent = `${this.pixelSize}px`;
+                    }
+                }
             }
         });
     }
@@ -962,84 +1627,80 @@ class Whiteboard {
     }
 
     saveState() {
-        // Only keep up to currentHistoryIndex (discard redo states)
-        this.history = this.history.slice(0, this.currentHistoryIndex + 1);
-        // Serialize elements, converting image content to data URL
-        const serializedElements = this.elements.map(el => {
-            if (el.type === 'image') {
-                return {
-                    ...el,
-                    content: el.content.src // store image as data URL
-                };
-            }
-            return { ...el };
-        });
-        // Save selected element index
-        const selectedIndex = this.selectedElement ? this.elements.indexOf(this.selectedElement) : -1;
-        this.history.push({
-            elements: serializedElements,
+        // Save current state to history
+        const state = {
             drawingCanvas: this.drawingCanvas.toDataURL(),
-            selectedIndex,
-            actions: JSON.parse(JSON.stringify(this.actions))
-        });
-        // Increment currentHistoryIndex ONCE, after pushing
-        this.currentHistoryIndex = this.history.length - 1;
+            elements: JSON.parse(JSON.stringify(this.elements)),
+            actions: JSON.parse(JSON.stringify(this.actions)),
+            pixelGrid: this.isPixelatedMode ? JSON.parse(JSON.stringify(this.pixelGrid)) : null
+            // Do NOT store isPixelatedMode in history
+        };
+        // Remove any states after current index
+        this.history = this.history.slice(0, this.currentHistoryIndex + 1);
+        // Prevent duplicate states (compare to last state)
+        const lastState = this.history[this.history.length - 1];
+        if (lastState &&
+            lastState.drawingCanvas === state.drawingCanvas &&
+            JSON.stringify(lastState.elements) === JSON.stringify(state.elements) &&
+            JSON.stringify(lastState.actions) === JSON.stringify(state.actions) &&
+            JSON.stringify(lastState.pixelGrid) === JSON.stringify(state.pixelGrid)
+        ) {
+            // No change, don't push duplicate
+            return;
+        }
+        // Add new state
+        this.history.push(state);
+        this.currentHistoryIndex++;
+        // Limit history size to prevent memory issues
+        if (this.history.length > 50) {
+            this.history.shift();
+            this.currentHistoryIndex--;
+        }
+        // Save to localStorage
+        this.saveActionsToStorage();
     }
 
     undo() {
         if (this.currentHistoryIndex > 0) {
             this.currentHistoryIndex--;
-            const state = this.history[this.currentHistoryIndex];
-            // Restore elements, converting image content back to Image objects
-            this.elements = state.elements.map(el => {
-                if (el.type === 'image') {
-                    const img = new Image();
-                    img.src = el.content;
-                    return { ...el, content: img };
-                }
-                return { ...el };
-            });
-            // Restore selected element
-            this.selectedElement = (state.selectedIndex >= 0) ? this.elements[state.selectedIndex] : null;
-            // Restore drawing canvas
-            const img = new Image();
-            img.onload = () => {
-                this.drawingCtx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-                this.drawingCtx.drawImage(img, 0, 0);
-                this.redrawCanvas();
-            };
-            img.src = state.drawingCanvas;
-            this.actions = JSON.parse(JSON.stringify(state.actions));
-            this.saveActionsToStorage();
+            this.restoreState(this.history[this.currentHistoryIndex]);
         }
     }
 
     redo() {
         if (this.currentHistoryIndex < this.history.length - 1) {
             this.currentHistoryIndex++;
-            const state = this.history[this.currentHistoryIndex];
-            // Restore elements, converting image content back to Image objects
-            this.elements = state.elements.map(el => {
-                if (el.type === 'image') {
-                    const img = new Image();
-                    img.src = el.content;
-                    return { ...el, content: img };
-                }
-                return { ...el };
-            });
-            // Restore selected element
-            this.selectedElement = (state.selectedIndex >= 0) ? this.elements[state.selectedIndex] : null;
-            // Restore drawing canvas
-            const img = new Image();
-            img.onload = () => {
-                this.drawingCtx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-                this.drawingCtx.drawImage(img, 0, 0);
-                this.redrawCanvas();
-            };
-            img.src = state.drawingCanvas;
-            this.actions = JSON.parse(JSON.stringify(state.actions));
-            this.saveActionsToStorage();
+            this.restoreState(this.history[this.currentHistoryIndex]);
         }
+    }
+
+    restoreState(state) {
+        // Restore drawing canvas
+        const img = new Image();
+        img.onload = () => {
+            this.drawingCtx.clearRect(0, 0, this.drawingCanvas.width, this.drawingCanvas.height);
+            this.drawingCtx.drawImage(img, 0, 0);
+            // Redraw after image is loaded
+            this.redrawCanvas();
+        };
+        img.src = state.drawingCanvas;
+        // Restore elements
+        this.elements = state.elements || [];
+        // Restore actions
+        this.actions = state.actions || [];
+        // Restore pixel grid if in pixelated mode
+        if (this.isPixelatedMode) {
+            if (state.pixelGrid) {
+                this.pixelGrid = state.pixelGrid;
+                this.drawPixelGrid();
+            } else {
+                // If no pixelGrid in state, clear the grid
+                this.initializePixelGrid();
+                this.drawPixelGrid();
+            }
+        }
+        // Do NOT switch mode based on undo/redo
+        // this.redrawCanvas(); // Now called after image load
     }
 
     saveImage(format) {
@@ -1152,6 +1813,11 @@ class Whiteboard {
             
             this.ctx.restore();
         });
+        
+        // Draw pixelated board on top if in pixelated mode
+        if (this.isPixelatedMode) {
+            this.ctx.drawImage(this.pixelCanvas, 0, 0);
+        }
     }
 
     setupNFTMinting() {
@@ -1510,21 +2176,74 @@ class Whiteboard {
         const height = +this.canvas.height;
         let svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}">`;
         svg += `<rect width="100%" height="100%" fill="white"/>`;
-        for (const action of this.actions) {
-            if ((action.type === 'pencil' || action.type === 'brush') && action.points.length >= 2) {
-                // Limit decimals for all points
-                const d = action.points.map((pt, i) =>
-                    (i === 0
-                        ? `M${pt.x.toFixed(1)},${pt.y.toFixed(1)}`
-                        : `L${pt.x.toFixed(1)},${pt.y.toFixed(1)}`)
-                ).join('');
-                svg += `<path d="${d}" stroke="${action.color}" stroke-width="${Number(action.size).toFixed(1)}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+        
+        // If in pixelated mode, export pixel grid
+        if (this.isPixelatedMode) {
+            const cols = this.pixelGrid[0].length;
+            const rows = this.pixelGrid.length;
+            
+            for (let row = 0; row < rows; row++) {
+                for (let col = 0; col < cols; col++) {
+                    const x = col * this.pixelSize;
+                    const y = row * this.pixelSize;
+                    const color = this.pixelGrid[row][col];
+                    
+                    // Only add non-white pixels to save space
+                    if (color !== '#FFFFFF') {
+                        svg += `<rect x="${x}" y="${y}" width="${this.pixelSize}" height="${this.pixelSize}" fill="${color}"/>`;
+                    }
+                }
             }
-            if (action.type === 'text' && action.content) {
-                svg += `<text x="${Number(action.x).toFixed(1)}" y="${Number(action.y).toFixed(1)}" font-family="${action.fontFamily || 'Arial'}" font-size="${Number(action.fontSize || 24).toFixed(1)}" fill="${action.color || '#000'}">${action.content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</text>`;
+        } else {
+            // Export regular drawing actions
+            for (const action of this.actions) {
+                if ((action.type === 'pencil' || action.type === 'brush') && action.points.length >= 2) {
+                    // Limit decimals for all points
+                    const d = action.points.map((pt, i) =>
+                        (i === 0
+                            ? `M${pt.x.toFixed(1)},${pt.y.toFixed(1)}`
+                            : `L${pt.x.toFixed(1)},${pt.y.toFixed(1)}`)
+                    ).join('');
+                    svg += `<path d="${d}" stroke="${action.color}" stroke-width="${Number(action.size).toFixed(1)}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+                }
+                if (action.type === 'text' && action.content) {
+                    svg += `<text x="${Number(action.x).toFixed(1)}" y="${Number(action.y).toFixed(1)}" font-family="${action.fontFamily || 'Arial'}" font-size="${Number(action.fontSize || 24).toFixed(1)}" fill="${action.color || '#000'}">${action.content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</text>`;
+                }
+                // Add more types as needed (eraser, shapes, etc.)
             }
-            // Add more types as needed (eraser, shapes, etc.)
         }
+        
+        svg += '</svg>';
+        // Remove all unnecessary whitespace and newlines
+        svg = svg.replace(/\s{2,}/g, ' ').replace(/\n/g, '').replace(/>\s+</g, '><').trim();
+        return svg;
+    }
+
+    /**
+     * Export pixelated board as SVG
+     */
+    exportPixelatedAsSVG() {
+        const width = +this.canvas.width;
+        const height = +this.canvas.height;
+        let svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}">`;
+        svg += `<rect width="100%" height="100%" fill="white"/>`;
+        
+        const cols = this.pixelGrid[0].length;
+        const rows = this.pixelGrid.length;
+        
+        for (let row = 0; row < rows; row++) {
+            for (let col = 0; col < cols; col++) {
+                const x = col * this.pixelSize;
+                const y = row * this.pixelSize;
+                const color = this.pixelGrid[row][col];
+                
+                // Only add non-white pixels to save space
+                if (color !== '#FFFFFF') {
+                    svg += `<rect x="${x}" y="${y}" width="${this.pixelSize}" height="${this.pixelSize}" fill="${color}"/>`;
+                }
+            }
+        }
+        
         svg += '</svg>';
         // Remove all unnecessary whitespace and newlines
         svg = svg.replace(/\s{2,}/g, ' ').replace(/\n/g, '').replace(/>\s+</g, '><').trim();
@@ -1546,6 +2265,13 @@ class Whiteboard {
         const infoId = 'onChainInfoMsg';
 
         function setOnChainMode(enabled) {
+            // Enable/disable pixelated mode
+            if (enabled) {
+                this.enablePixelatedMode();
+            } else {
+                this.disablePixelatedMode();
+            }
+            
             // Only pencil and color picker enabled
             toolIds.forEach(id => {
                 const btn = document.getElementById(id);
@@ -1576,7 +2302,7 @@ class Whiteboard {
                     info = document.createElement('div');
                     info.id = infoId;
                     info.style = 'color:#e302f7;font-weight:600;text-align:center;margin:10px 0;';
-                    info.innerText = 'On-Chain Mode: Only pencil and color are enabled for gas-efficient SVG NFTs.';
+                    info.innerText = 'On-Chain Mode: Pixelated board enabled for gas-efficient SVG NFTs. Click pixels to color them!';
                     document.querySelector('.app-header').appendChild(info);
                 }
             } else {
@@ -1597,14 +2323,18 @@ class Whiteboard {
                 if (aiGenBtn) aiGenBtn.disabled = false;
             }
         }
+        
+        // Bind the function to the whiteboard instance
+        const boundSetOnChainMode = setOnChainMode.bind(this);
+        
         if (toggleBtn) {
             toggleBtn.addEventListener('click', () => {
                 const isOn = toggleBtn.getAttribute('aria-pressed') === 'true';
                 toggleBtn.setAttribute('aria-pressed', (!isOn).toString());
-                setOnChainMode(!isOn);
+                boundSetOnChainMode(!isOn);
             });
             // Set initial state
-            setOnChainMode(toggleBtn.getAttribute('aria-pressed') === 'true');
+            boundSetOnChainMode(toggleBtn.getAttribute('aria-pressed') === 'true');
         }
     }
 
@@ -1634,12 +2364,73 @@ class Whiteboard {
         // Also show in notification
         showNotification(`SVG Size: ${svgInfo.size} chars (${svgInfo.percentage}% of limit)`, svgInfo.isTooLarge ? 'error' : svgInfo.isLarge ? 'warning' : 'success');
     }
+
+    // Clear pixelated board
+    clearPixelatedBoard() {
+        const cols = this.pixelGrid[0].length;
+        const rows = this.pixelGrid.length;
+        
+        for (let row = 0; row < rows; row++) {
+            for (let col = 0; col < cols; col++) {
+                this.pixelGrid[row][col] = '#FFFFFF'; // Reset to white
+            }
+        }
+        
+        this.drawPixelGrid();
+        this.redrawCanvas();
+        this.saveState(); // Save state after clearing
+    }
+
+    // Override clear functionality to handle both modes
+    clearCanvas() {
+        if (this.isPixelatedMode) {
+            this.clearPixelatedBoard();
+        } else {
+            // Clear regular whiteboard
+            this.drawingCtx.fillStyle = 'white';
+            this.drawingCtx.fillRect(0, 0, this.drawingCanvas.width, this.drawingCanvas.height);
+            this.elements = [];
+            this.actions = [];
+            // Do NOT reset currentHistoryIndex here!
+            this.redrawCanvas();
+        }
+        this.saveState();
+    }
+
+    setupModeSwitchButton() {
+        const modeSwitchBtn = document.getElementById('modeSwitchBtn');
+        if (!modeSwitchBtn) return;
+        const updateBtn = () => {
+            if (this.isPixelatedMode) {
+                modeSwitchBtn.textContent = 'Switch to Whiteboard';
+            } else {
+                modeSwitchBtn.textContent = 'Switch to Pixelated Board';
+            }
+            modeSwitchBtn.disabled = false;
+            modeSwitchBtn.style.opacity = '1';
+        };
+        modeSwitchBtn.onclick = () => {
+            if (this.isPixelatedMode) {
+                this.disablePixelatedMode();
+            } else {
+                this.enablePixelatedMode();
+            }
+            updateBtn();
+        };
+        // Update on mode change
+        const origEnable = this.enablePixelatedMode.bind(this);
+        this.enablePixelatedMode = (...args) => { origEnable(...args); updateBtn(); };
+        const origDisable = this.disablePixelatedMode.bind(this);
+        this.disablePixelatedMode = (...args) => { origDisable(...args); updateBtn(); };
+        updateBtn();
+    }
 }
 
 // Initialize the whiteboard when the page loads
 window.addEventListener('load', () => {
     window.whiteboard = new Whiteboard();
     window.whiteboard.setupOnChainModeToggle();
+    window.whiteboard.setupModeSwitchButton();
 });
 
 // Notification function
