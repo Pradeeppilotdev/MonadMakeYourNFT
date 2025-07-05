@@ -499,6 +499,46 @@ input[type="range"]::-webkit-slider-thumb:hover {
     cursor: crosshair !important;
 }
 
+/* Add styles for Monanimal mode */
+.monanimal-mode-active {
+    cursor: default !important;
+}
+
+.monanimal-mode-active canvas {
+    cursor: default !important;
+}
+
+/* Monanimal builder button styling */
+#monanimalBuilder {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    color: white !important;
+    border: 2px solid #4a5568 !important;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3) !important;
+    transition: all 0.3s ease !important;
+}
+
+#monanimalBuilder:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4) !important;
+}
+
+#monanimalBuilder.active {
+    background: linear-gradient(135deg, #764ba2 0%, #667eea 100%) !important;
+    box-shadow: 0 4px 12px rgba(118, 75, 162, 0.4) !important;
+}
+
+#monanimalBuilder.control-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+#monanimalBuilder.control-btn p {
+  margin: 4px 0 0 0;
+  font-size: 0.95em;
+  line-height: 1.1;
+}
+
 #pixelColorPicker {
     animation: slideIn 0.3s ease-out;
 }
@@ -538,4 +578,15 @@ input[type="range"]::-webkit-slider-thumb:hover {
 .pixel-hover {
     opacity: 0.7;
     transition: opacity 0.1s ease;
+} 
+
+/* Neon purple border for AI image button */
+#aiGenerate.control-btn {
+  border: 2px solid #8a4dff;
+  box-shadow: 0 0 4px 1px #8a4dff, 0 0 8px 2px #7b2ff2;
+  z-index: 2;
+}
+#aiGenerate.control-btn:focus, #aiGenerate.control-btn:hover {
+  border-color: #a855f7;
+  box-shadow: 0 0 6px 2px #a855f7, 0 0 12px 4px #7b2ff2;
 } 

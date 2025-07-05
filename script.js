@@ -1,5 +1,17 @@
 class Whiteboard {
     constructor() {
+        // Monanimal properties FIRST!
+        this.isMonanimalMode = false;
+        this.monanimalTraits = {
+            head: [],
+            eyes: [],
+            mouth: [],
+            crown: [],
+            dress: [],
+            hand: [],
+            nose: []
+        };
+        this.selectedTraitCategory = 'head';
         console.log('Initializing Whiteboard...');
         this.canvas = document.getElementById('whiteboard');
         this.ctx = this.canvas.getContext('2d');
@@ -121,6 +133,7 @@ class Whiteboard {
         // Initialize emoji picker immediately
         this.setupEmojiPicker();
         this.setupNFTMinting();
+        this.setupMonanimalBuilder();
 
         // In constructor
         this.lastDot = null;
@@ -761,67 +774,67 @@ class Whiteboard {
             const rect = this.canvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
-
-            // Handle pixel clicking in pixelated mode
-            if (this.isPixelatedMode) {
-                this.handlePixelClick(x, y);
-                return;
+            let clickedOnHandle = false;
+            // 1. Handle logic for handles (rotate/delete)
+            if (this.selectedElement) {
+                const bounds = this.getElementBounds(this.selectedElement);
+                const cx = this.selectedElement.x + bounds.width/2;
+                const cy = this.selectedElement.y + bounds.height/2;
+                const angle = this.selectedElement.rotation || 0;
+                const relX = Math.cos(-angle) * (x - cx) - Math.sin(-angle) * (y - cy);
+                const relY = Math.sin(-angle) * (x - cx) + Math.cos(-angle) * (y - cy);
+                // Rotation handle
+                const handleRadius = 16;
+                const handleOffset = 40;
+                const handleX = 0;
+                const handleY = -bounds.height/2 - handleOffset;
+                if (Math.hypot(relX - handleX, relY - handleY) < handleRadius) {
+                    isRotating = true;
+                    rotateElement = this.selectedElement;
+                    rotateStartAngle = Math.atan2(y - cy, x - cx) - (this.selectedElement.rotation || 0);
+                    clickedOnHandle = true;
+                    return;
+                }
+                // Delete button
+                const deleteRadius = 16;
+                const deleteX = bounds.width/2 + 10;
+                const deleteY = -bounds.height/2 - 10;
+                if (Math.hypot(relX - deleteX, relY - deleteY) < deleteRadius) {
+                    // Delete the selected element
+                    this.elements = this.elements.filter(el => el !== this.selectedElement);
+                    this.selectedElement = null;
+                    this.isDragging = false;
+                    this.isCropping = false;
+                    this.isDrawing = false;
+                    this.redrawCanvas();
+                    this.saveState();
+                    clickedOnHandle = true;
+                    return;
+                }
             }
-
-            // Crop/Resize tool: always allow selecting an image or emoji, and clicking empty space deselects
-            if (["crop", "resize"].includes(this.currentTool)) {
-                const element = this.findElementAtPosition(x, y);
-                if (element && (element.type === "image" || element.type === "emoji")) {
+            // 2. If clicking on an element (not a handle), select and start crop/resize
+            const element = this.findElementAtPosition(x, y);
+            if (element && !clickedOnHandle) {
+                if (["crop", "resize"].includes(this.currentTool)) {
                     this.selectedElement = element;
                     this.isDragging = this.currentTool === "resize";
                     this.isCropping = this.currentTool === "crop";
                     this.dragStartX = x - element.x;
                     this.dragStartY = y - element.y;
-                    console.log('Selected', element.type, 'for', this.currentTool, 'at', x, y);
-                } else {
-                    // Clicked empty space: deselect
-                    this.selectedElement = null;
-                    this.isDragging = false;
-                    this.isCropping = false;
-                    console.log('Deselected image/emoji');
+                    this.redrawCanvas();
+                    return;
                 }
-                this.redrawCanvas();
-                return;
+                // (other tool logic can go here if needed)
             }
-
-            if (["pencil", "brush", "spray", "eraser", "blur", "smudge", "dotted"].includes(this.currentTool)) {
-                this.isDrawing = true;
-                this.lastX = x;
-                this.lastY = y;
-                if (this.currentTool === 'dotted') {
-                    this.lastDot = { x, y };
-                }
-                return;
-            }
-
-            // Handle element manipulation
-            const currentTime = new Date().getTime();
-            const timeSinceLastClick = currentTime - this.lastClickTime;
-            const element = this.findElementAtPosition(x, y);
-
-            if (timeSinceLastClick < this.doubleClickThreshold && element) {
-                this.selectedElement = element;
-                this.isCropping = true;
-                this.isDragging = false;
-            } else if (element) {
-                this.selectedElement = element;
-                this.isDragging = true;
-                this.isCropping = false;
-                this.dragStartX = x - element.x;
-                this.dragStartY = y - element.y;
-            } else {
+            // 3. If clicking empty space, clear selection
+            if (!element && !clickedOnHandle) {
                 this.selectedElement = null;
                 this.isDragging = false;
                 this.isCropping = false;
+                this.isDrawing = false;
+                this.redrawCanvas();
             }
-
-            this.lastClickTime = currentTime;
-            this.redrawCanvas();
+            // (rest of your mousedown logic for drawing, etc.)
         });
 
         this.canvas.addEventListener('mousemove', (e) => {
@@ -835,8 +848,8 @@ class Whiteboard {
                 return;
             }
 
-            // Crop/Resize logic for images and emojis
-            if ((this.isCropping || this.isDragging) && this.selectedElement && (this.selectedElement.type === 'image' || this.selectedElement.type === 'emoji')) {
+            // Crop/Resize logic for images, emojis, text, and monanimal characters
+            if ((this.isCropping || this.isDragging) && this.selectedElement && (this.selectedElement.type === 'image' || this.selectedElement.type === 'emoji' || this.selectedElement.type === 'text' || this.selectedElement.type === 'monanimal')) {
                 if (this.isDragging) {
                     // Resize: update width/height based on mouse position
                     const newWidth = Math.max(10, x - this.selectedElement.x);
@@ -1068,26 +1081,94 @@ class Whiteboard {
             }
         });
 
-        // Mouse wheel for pixel size adjustment in pixelated mode
-        this.canvas.addEventListener('wheel', (e) => {
-            if (this.isPixelatedMode) {
-                e.preventDefault();
-                const delta = e.deltaY > 0 ? -2 : 2;
-                const newSize = Math.max(8, Math.min(50, this.pixelSize + delta));
-                if (newSize !== this.pixelSize) {
-                    this.pixelSize = newSize;
-                    this.initializePixelGrid();
-                    this.drawPixelGrid();
-                    this.redrawCanvas();
-                    
-                    // Update pixel size display if color picker is open
-                    const pixelSizeDisplay = document.querySelector('#pixelColorPicker span');
-                    if (pixelSizeDisplay && pixelSizeDisplay.textContent.includes('px')) {
-                        pixelSizeDisplay.textContent = `${this.pixelSize}px`;
-                    }
-                }
+        // Mouse wheel for pixel size adjustment in pixelated mode - DISABLED
+        // this.canvas.addEventListener('wheel', (e) => {
+        //     if (this.isPixelatedMode) {
+        //         e.preventDefault();
+        //         const delta = e.deltaY > 0 ? -2 : 2;
+        //         const newSize = Math.max(8, Math.min(50, this.pixelSize + delta));
+        //         if (newSize !== this.pixelSize) {
+        //             this.pixelSize = newSize;
+        //             this.initializePixelGrid();
+        //             this.drawPixelGrid();
+        //             this.redrawCanvas();
+        //             
+        //             // Update pixel size display if color picker is open
+        //             const pixelSizeDisplay = document.querySelector('#pixelColorPicker span');
+        //             if (pixelSizeDisplay && pixelSizeDisplay.textContent.includes('px')) {
+        //                 pixelSizeDisplay.textContent = `${this.pixelSize}px`;
+        //             }
+        //         }
+        //     }
+        // });
+
+        // --- In setupEventListeners, improve handle hit detection and tool state reset ---
+        let isRotating = false;
+        let rotateStartAngle = 0;
+        let rotateElement = null;
+
+        this.canvas.addEventListener('mousedown', (e) => {
+            if (!this.selectedElement) return;
+            const rect = this.canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            const bounds = this.getElementBounds(this.selectedElement);
+            // Center of element
+            const cx = this.selectedElement.x + bounds.width/2;
+            const cy = this.selectedElement.y + bounds.height/2;
+            const angle = this.selectedElement.rotation || 0;
+            // Calculate mouse position relative to element center, rotated
+            const relX = Math.cos(-angle) * (x - cx) - Math.sin(-angle) * (y - cy);
+            const relY = Math.sin(-angle) * (x - cx) + Math.cos(-angle) * (y - cy);
+            // Rotation handle (above element)
+            const handleRadius = 16;
+            const handleOffset = 40;
+            const handleX = 0;
+            const handleY = -bounds.height/2 - handleOffset;
+            if (Math.hypot(relX - handleX, relY - handleY) < handleRadius) {
+                isRotating = true;
+                rotateElement = this.selectedElement;
+                rotateStartAngle = Math.atan2(y - cy, x - cx) - (this.selectedElement.rotation || 0);
+                return;
+            }
+            // Delete button (top-right corner)
+            const deleteRadius = 16;
+            const deleteX = bounds.width/2 + 10;
+            const deleteY = -bounds.height/2 - 10;
+            if (Math.hypot(relX - deleteX, relY - deleteY) < deleteRadius) {
+                // Delete the selected element
+                this.elements = this.elements.filter(el => el !== this.selectedElement);
+                this.selectedElement = null;
+                this.isDragging = false;
+                this.isCropping = false;
+                this.isDrawing = false;
+                this.redrawCanvas();
+                this.saveState();
+                // Reset tool state to allow further actions
+                // (Keep currentTool as is, but clear selection)
+                return;
             }
         });
+        this.canvas.addEventListener('mousemove', (e) => {
+            if (isRotating && rotateElement) {
+                const rect = this.canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                const bounds = this.getElementBounds(rotateElement);
+                const cx = rotateElement.x + bounds.width/2;
+                const cy = rotateElement.y + bounds.height/2;
+                rotateElement.rotation = Math.atan2(y - cy, x - cx) - rotateStartAngle;
+                this.redrawCanvas();
+            }
+        });
+        this.canvas.addEventListener('mouseup', () => {
+            if (isRotating) {
+                isRotating = false;
+                rotateElement = null;
+                this.saveState();
+            }
+        });
+        // --- End improved handle logic ---
     }
 
     setupTools() {
@@ -1748,10 +1829,9 @@ class Whiteboard {
         // Draw all elements
         this.elements.forEach(element => {
             this.ctx.save();
-            
             // Apply transformations
             this.ctx.translate(element.x + element.width/2, element.y + element.height/2);
-            this.ctx.rotate(element.rotation);
+            this.ctx.rotate(element.rotation || 0);
             this.ctx.scale(element.scale, element.scale);
             
             switch (element.type) {
@@ -1764,13 +1844,20 @@ class Whiteboard {
                     break;
                     
                 case 'image':
-                    this.ctx.drawImage(
-                        element.content,
-                        -element.width/2,
-                        -element.height/2,
-                        element.width,
-                        element.height
-                    );
+                case 'monanimal':
+                    if (
+                        element.content &&
+                        (element.content instanceof HTMLImageElement ||
+                         element.content instanceof HTMLCanvasElement)
+                    ) {
+                        this.ctx.drawImage(
+                            element.content,
+                            -element.width/2,
+                            -element.height/2,
+                            element.width,
+                            element.height
+                        );
+                    }
                     break;
                     
                 case 'emoji':
@@ -1809,8 +1896,43 @@ class Whiteboard {
                         );
                     });
                 }
+
+                // --- Draw handles in rotated context ---
+                // Draw rotation handle (above the element)
+                const handleRadius = 12;
+                const handleOffset = 40;
+                const handleX = 0;
+                const handleY = -bounds.height/2 - handleOffset;
+                this.ctx.beginPath();
+                this.ctx.arc(handleX, handleY, handleRadius, 0, 2 * Math.PI);
+                this.ctx.fillStyle = '#fff';
+                this.ctx.strokeStyle = '#7b2ff2';
+                this.ctx.lineWidth = 2;
+                this.ctx.fill();
+                this.ctx.stroke();
+                this.ctx.font = '16px Arial';
+                this.ctx.fillStyle = '#7b2ff2';
+                this.ctx.textAlign = 'center';
+                this.ctx.textBaseline = 'middle';
+                this.ctx.fillText('⟳', handleX, handleY);
+                // Draw delete button (top-right corner)
+                const deleteSize = 24;
+                const deleteX = bounds.width/2 + 10;
+                const deleteY = -bounds.height/2 - 10;
+                this.ctx.beginPath();
+                this.ctx.arc(deleteX, deleteY, deleteSize/2, 0, 2 * Math.PI);
+                this.ctx.fillStyle = '#fff';
+                this.ctx.strokeStyle = '#e74c3c';
+                this.ctx.lineWidth = 2;
+                this.ctx.fill();
+                this.ctx.stroke();
+                this.ctx.font = '18px Arial';
+                this.ctx.fillStyle = '#e74c3c';
+                this.ctx.textAlign = 'center';
+                this.ctx.textBaseline = 'middle';
+                this.ctx.fillText('🗑', deleteX, deleteY);
+                // --- End handles ---
             }
-            
             this.ctx.restore();
         });
         
@@ -1835,6 +1957,321 @@ class Whiteboard {
         
         if (testMinimalSVGBtn) {
             testMinimalSVGBtn.addEventListener('click', () => this.testMinimalSVGMinting());
+        }
+    }
+
+    // Load Monanimal traits from the traits folder
+    async loadMonanimalTraits() {
+        const traitCategories = ['head', 'eyes', 'mouth', 'crown', 'dress', 'hand', 'nose'];
+        
+        for (const category of traitCategories) {
+            this.monanimalTraits[category] = [];
+            try {
+                // For now, we'll use a simple naming convention
+                // In a real implementation, you'd scan the directory
+                const traitFiles = this.getTraitFilesForCategory(category);
+                for (const file of traitFiles) {
+                    const img = new Image();
+                    img.src = `Monanimal Traits/${category}/${file}`;
+                    await new Promise((resolve) => {
+                        img.onload = () => {
+                            this.monanimalTraits[category].push({
+                                name: file,
+                                image: img,
+                                category: category
+                            });
+                            resolve();
+                        };
+                        img.onerror = () => resolve(); // Skip failed loads
+                    });
+                }
+            } catch (error) {
+                console.log(`Could not load traits for ${category}:`, error);
+            }
+        }
+        console.log('Loaded Monanimal traits:', this.monanimalTraits);
+    }
+
+    // Get trait files for each category (you can customize this based on your actual files)
+    getTraitFilesForCategory(category) {
+        const traitFiles = {
+            head: [
+                'monanimalhead.png',
+                'Picsart_25-07-03_22-50-27-175.png',
+                'ChatGPT Image Jun 30, 2025, 03_49_14 PM.png',
+                'ChatGPT Image Jun 29, 2025, 10_40_57 PM.png',
+                'chog.png',
+                'allowit.png',
+                'ChatGPT Image Jun 29, 2025, 09_33_29 PM.png'
+            ],
+            eyes: [
+                'Picsart_25-06-30_20-14-16-512.png',
+                'ChatGPT Image Jun 30, 2025, 04_47_38 PM.png',
+                'ChatGPT Image Jun 30, 2025, 06_20_51 PM.png',
+                'ChatGPT Image Jun 30, 2025, 04_08_19 PM.png'
+            ],
+            mouth: [
+                'IMG_20250630_193739_480.png',
+                'IMG_20250630_193738_130.png',
+                'ChatGPT Image Jun 30, 2025, 06_37_56 PM.png',
+                'ChatGPT Image Jun 30, 2025, 06_34_49 PM.png',
+                'ChatGPT Image Jun 30, 2025, 06_31_45 PM.png',
+                '12_1_720.png',
+                'ChatGPT Image Jun 30, 2025, 06_23_03 PM.png'
+            ],
+            crown: ['crown1.png',
+                    'crown2.png',
+                    'crown3.png',
+                    'crown4.png'
+                   ], // Add actual crown files
+            dress: ['dress1.png',
+                    'dress2.png',
+                    'dress3.png',
+                    'dress4.png'
+                   ], // Add actual dress files
+            hand: ['hand1.png', 
+                   'hand2.png',
+                   'hand3.png',
+                   'hand4.png'
+                  ], // Add actual hand files
+            nose: ['nose1.png',
+                   'nose2.png',
+                   'nose3.png',
+                   'nose4.png'
+                  ] // Add actual nose files
+        };
+        return traitFiles[category] || [];
+    }
+
+    // Setup Monanimal character builder
+    setupMonanimalBuilder() {
+        const monanimalBtn = document.getElementById('monanimalBuilder');
+        if (monanimalBtn) {
+            monanimalBtn.addEventListener('click', () => {
+                this.toggleMonanimalMode();
+            });
+        }
+        
+        // Load traits when initializing
+        this.loadMonanimalTraits();
+    }
+
+    // Toggle Monanimal mode
+    toggleMonanimalMode() {
+        this.isMonanimalMode = !this.isMonanimalMode;
+        
+        if (this.isMonanimalMode) {
+            this.enableMonanimalMode();
+        } else {
+            this.disableMonanimalMode();
+        }
+    }
+
+    // Enable Monanimal mode
+    enableMonanimalMode() {
+        this.isMonanimalMode = true;
+        this.canvas.classList.add('monanimal-mode-active');
+        this.setupMonanimalPartsCatalog();
+        this.redrawCanvas();
+    }
+
+    // Disable Monanimal mode
+    disableMonanimalMode() {
+        this.isMonanimalMode = false;
+        this.canvas.classList.remove('monanimal-mode-active');
+        this.removeMonanimalPartsCatalog();
+        this.redrawCanvas();
+    }
+
+    // Setup Monanimal parts catalog
+    setupMonanimalPartsCatalog() {
+        this.removeMonanimalPartsCatalog();
+        
+        const catalogContainer = document.createElement('div');
+        catalogContainer.id = 'monanimalPartsCatalog';
+        catalogContainer.style.cssText = `
+            position: fixed;
+            top: 100px;
+            left: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: 2px solid #4a5568;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            z-index: 10000;
+            width: 400px;
+            max-height: 80vh;
+            overflow-y: auto;
+            color: white;
+            font-family: 'Arial', sans-serif;
+        `;
+
+        // Title
+        const title = document.createElement('h3');
+        title.textContent = '🐾 Monanimal Parts Catalog';
+        title.style.cssText = `
+            margin: 0 0 15px 0;
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        `;
+        catalogContainer.appendChild(title);
+
+        // Instructions
+        const instructions = document.createElement('p');
+        instructions.textContent = 'Click any part to add it to the canvas!';
+        instructions.style.cssText = `
+            margin: 0 0 15px 0;
+            text-align: center;
+            font-size: 14px;
+            opacity: 0.9;
+        `;
+        catalogContainer.appendChild(instructions);
+
+        // Trait categories
+        const categories = ['head', 'eyes', 'mouth', 'crown', 'dress', 'hand', 'nose'];
+        const categoryLabels = {
+            head: '👤 Heads',
+            eyes: '👁️ Eyes', 
+            mouth: '👄 Mouths',
+            crown: '👑 Crowns',
+            dress: '👗 Dresses',
+            hand: '✋ Hands',
+            nose: '👃 Noses'
+        };
+
+        categories.forEach(category => {
+            const categoryContainer = document.createElement('div');
+            categoryContainer.style.cssText = `
+                margin-bottom: 20px;
+            `;
+
+            const categoryLabel = document.createElement('h4');
+            categoryLabel.textContent = categoryLabels[category];
+            categoryLabel.style.cssText = `
+                margin: 0 0 10px 0;
+                font-weight: bold;
+                font-size: 16px;
+                border-bottom: 2px solid rgba(255,255,255,0.3);
+                padding-bottom: 5px;
+            `;
+            categoryContainer.appendChild(categoryLabel);
+
+            const partsGrid = document.createElement('div');
+            partsGrid.style.cssText = `
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 10px;
+            `;
+
+            // Add parts for this category
+            this.monanimalTraits[category].forEach((trait, index) => {
+                const partBtn = document.createElement('button');
+                partBtn.style.cssText = `
+                    width: 100%;
+                    height: 80px;
+                    background: rgba(255,255,255,0.1);
+                    border: 2px solid rgba(255,255,255,0.3);
+                    border-radius: 10px;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    overflow: hidden;
+                    position: relative;
+                `;
+                
+                // Create preview of the part
+                const partPreview = document.createElement('canvas');
+                partPreview.width = 60;
+                partPreview.height = 60;
+                partPreview.style.cssText = `
+                    border-radius: 6px;
+                    background: white;
+                `;
+                const ctx = partPreview.getContext('2d');
+                ctx.drawImage(trait.image, 0, 0, 60, 60);
+                partBtn.appendChild(partPreview);
+                
+                // Hover effects
+                partBtn.onmouseenter = () => {
+                    partBtn.style.transform = 'translateY(-3px) scale(1.05)';
+                    partBtn.style.boxShadow = '0 6px 20px rgba(0,0,0,0.3)';
+                    partBtn.style.borderColor = 'rgba(255,255,255,0.8)';
+                };
+                
+                partBtn.onmouseleave = () => {
+                    partBtn.style.transform = 'translateY(0) scale(1)';
+                    partBtn.style.boxShadow = 'none';
+                    partBtn.style.borderColor = 'rgba(255,255,255,0.3)';
+                };
+                
+                partBtn.onclick = () => {
+                    this.addMonanimalPartToCanvas(trait);
+                };
+                
+                partsGrid.appendChild(partBtn);
+            });
+
+            categoryContainer.appendChild(partsGrid);
+            catalogContainer.appendChild(categoryContainer);
+        });
+
+        // Close button
+        const closeBtn = document.createElement('button');
+        closeBtn.innerHTML = '✕';
+        closeBtn.style.cssText = `
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 30px;
+            height: 30px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+        `;
+        closeBtn.onclick = () => {
+            this.disableMonanimalMode();
+        };
+        catalogContainer.appendChild(closeBtn);
+
+        document.body.appendChild(catalogContainer);
+    }
+
+    // Add individual Monanimal part to canvas
+    addMonanimalPartToCanvas(trait) {
+        const element = {
+            type: 'monanimal',
+            content: trait.image,
+            x: this.canvas.width / 2 - 100,
+            y: this.canvas.height / 2 - 100,
+            width: 200,
+            height: 200,
+            rotation: 0,
+            scale: 1,
+            traitInfo: {
+                name: trait.name,
+                category: trait.category
+            }
+        };
+        this.elements.push(element);
+        this.redrawCanvas();
+        this.saveState();
+        
+        showNotification(`Added ${trait.category} part to canvas! 🐾`, 'success');
+    }
+
+    // Remove Monanimal parts catalog
+    removeMonanimalPartsCatalog() {
+        const existingCatalog = document.getElementById('monanimalPartsCatalog');
+        if (existingCatalog) {
+            existingCatalog.remove();
         }
     }
 
