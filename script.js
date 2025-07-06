@@ -834,7 +834,25 @@ class Whiteboard {
                 this.isDrawing = false;
                 this.redrawCanvas();
             }
-            // (rest of your mousedown logic for drawing, etc.)
+            
+            // 4. If a drawing tool is selected and not clicking on an element/handle, start drawing
+            if (
+                !clickedOnHandle &&
+                (!element || !["crop", "resize"].includes(this.currentTool)) &&
+                ['pencil', 'brush', 'spray', 'eraser', 'blur', 'smudge', 'dotted'].includes(this.currentTool)
+            ) {
+                this.isDrawing = true;
+                this.lastX = x;
+                this.lastY = y;
+                // For dotted, reset lastDot
+                if (this.currentTool === 'dotted') {
+                    this.lastDot = { x, y };
+                }
+                // Draw initial point for tools that need it
+                if (['pencil', 'brush', 'eraser', 'spray', 'blur', 'smudge'].includes(this.currentTool)) {
+                    this.draw({ clientX: e.clientX, clientY: e.clientY });
+                }
+            }
         });
 
         this.canvas.addEventListener('mousemove', (e) => {
