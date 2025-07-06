@@ -159,6 +159,12 @@ class Whiteboard {
         // Add to constructor
         this.isEyedropperActive = false;
         this.lastHoveredPixel = null;
+
+        // In constructor, add:
+        this.straightLineStartX = null;
+        this.straightLineStartY = null;
+        this.straightLinePreviewX = null;
+        this.straightLinePreviewY = null;
     }
 
     setupCanvas() {
@@ -945,11 +951,17 @@ class Whiteboard {
             if (
                 !clickedOnHandle &&
                 (!element || !["crop", "resize"].includes(this.currentTool)) &&
-                ['pencil', 'brush', 'spray', 'eraser', 'blur', 'smudge', 'dotted'].includes(this.currentTool)
+                ['pencil', 'brush', 'straightLine', 'spray', 'eraser', 'blur', 'smudge', 'dotted'].includes(this.currentTool)
             ) {
                 this.isDrawing = true;
                 this.lastX = x;
                 this.lastY = y;
+                if (this.currentTool === 'straightLine') {
+                    this.straightLineStartX = x;
+                    this.straightLineStartY = y;
+                    this.straightLinePreviewX = x;
+                    this.straightLinePreviewY = y;
+                }
                 // For dotted, reset lastDot
                 if (this.currentTool === 'dotted') {
                     this.lastDot = { x, y };
@@ -993,10 +1005,17 @@ class Whiteboard {
 
             // Default move logic
             if (this.isDrawing) {
-                this.draw(e);
-                this.lastX = x;
-                this.lastY = y;
-                return;
+                if (this.currentTool === 'straightLine') {
+                    this.straightLinePreviewX = x;
+                    this.straightLinePreviewY = y;
+                    this.redrawCanvas();
+                    return;
+                } else {
+                    this.draw(e);
+                    this.lastX = x;
+                    this.lastY = y;
+                    return;
+                }
             }
 
             if (this.selectedElement) {
@@ -1013,8 +1032,39 @@ class Whiteboard {
             }
         });
 
-        this.canvas.addEventListener('mouseup', () => {
+        this.canvas.addEventListener('mouseup', (e) => {
             if (this.isDrawing) {
+                if (this.currentTool === 'straightLine') {
+                    const rect = this.canvas.getBoundingClientRect();
+                    const endX = e.clientX - rect.left;
+                    const endY = e.clientY - rect.top;
+                    // Draw the final straight line
+                    this.drawingCtx.save();
+                    this.drawingCtx.strokeStyle = this.color;
+                    this.drawingCtx.lineWidth = this.size;
+                    this.drawingCtx.setLineDash([]);
+                    this.drawingCtx.beginPath();
+                    this.drawingCtx.moveTo(this.straightLineStartX, this.straightLineStartY);
+                    this.drawingCtx.lineTo(endX, endY);
+                    this.drawingCtx.stroke();
+                    this.drawingCtx.restore();
+                    // Save the action
+                    this.currentAction = {
+                        type: 'straightLine',
+                        color: this.color,
+                        size: this.size,
+                        points: [
+                            { x: this.straightLineStartX, y: this.straightLineStartY },
+                            { x: endX, y: endY }
+                        ]
+                    };
+                    this.actions.push(this.currentAction);
+                    this.saveActionsToStorage();
+                    this.straightLineStartX = null;
+                    this.straightLineStartY = null;
+                    this.straightLinePreviewX = null;
+                    this.straightLinePreviewY = null;
+                }
                 this.isDrawing = false;
                 this.saveState();
             } else if (this.isDragging || this.isCropping) {
@@ -1310,6 +1360,12 @@ class Whiteboard {
                 document.getElementById('brush').classList.add('active');
                 document.getElementById('textToolPopover').style.display = 'none';
             },
+            'straightLine': () => {
+                this.clearActiveStates();
+                this.currentTool = 'straightLine';
+                document.getElementById('straightLine').classList.add('active');
+                document.getElementById('textToolPopover').style.display = 'none';
+            },
             'spray': () => {
                 this.clearActiveStates();
                 this.currentTool = 'spray';
@@ -1414,7 +1470,7 @@ class Whiteboard {
         this.selectedElement = null;
         
         // Reset drawing tool state
-        if (['pencil', 'brush', 'spray', 'eraser', 'blur', 'smudge', 'dotted'].includes(this.currentTool)) {
+        if (['pencil', 'brush', 'straightLine', 'spray', 'eraser', 'blur', 'smudge', 'dotted'].includes(this.currentTool)) {
             this.isDrawing = false;
         }
     }
@@ -1547,6 +1603,9 @@ class Whiteboard {
             case 'brush':
                 this.drawBrush(x, y);
                 break;
+            case 'straightLine':
+                this.drawStraightLine(x, y);
+                break;
             case 'spray':
                 this.drawSpray(x, y);
                 break;
@@ -1595,6 +1654,21 @@ class Whiteboard {
         this.drawingCtx.lineWidth = this.size * 2;
         this.drawingCtx.stroke();
         this.redrawCanvas();
+    }
+
+    drawStraightLine(x, y) {
+        // For straight line tool, we only draw a preview during dragging
+        // The actual line will be drawn when mouse is released
+        // Clear the canvas and redraw everything except the current preview
+        this.redrawCanvas();
+        
+        // Draw preview line from start to current mouse position
+        this.drawingCtx.beginPath();
+        this.drawingCtx.moveTo(this.lastX, this.lastY);
+        this.drawingCtx.lineTo(x, y);
+        this.drawingCtx.strokeStyle = this.color;
+        this.drawingCtx.lineWidth = this.size;
+        this.drawingCtx.stroke();
     }
 
     drawSpray(x, y) {
@@ -2063,6 +2137,20 @@ class Whiteboard {
         // Draw pixelated board on top if in pixelated mode
         if (this.isPixelatedMode) {
             this.ctx.drawImage(this.pixelCanvas, 0, 0);
+        }
+
+        // In redrawCanvas, after drawing everything else, add:
+        if (this.isDrawing && this.currentTool === 'straightLine' && this.straightLineStartX !== null && this.straightLinePreviewX !== null) {
+            this.ctx.save();
+            this.ctx.strokeStyle = this.color;
+            this.ctx.lineWidth = this.size;
+            this.ctx.setLineDash([6, 6]);
+            this.ctx.beginPath();
+            this.ctx.moveTo(this.straightLineStartX, this.straightLineStartY);
+            this.ctx.lineTo(this.straightLinePreviewX, this.straightLinePreviewY);
+            this.ctx.stroke();
+            this.ctx.setLineDash([]);
+            this.ctx.restore();
         }
     }
 
@@ -2819,7 +2907,7 @@ class Whiteboard {
     setupOnChainModeToggle() {
         const toggleBtn = document.getElementById('onChainModeToggle');
         const onChainMintBtn = document.getElementById('mintOnChainNFT');
-        const toolIds = ['pencil', 'brush', 'spray', 'eraser', 'text', 'blur', 'smudge', 'dotted', 'crop', 'resize'];
+        const toolIds = ['pencil', 'brush', 'spray', 'eraser', 'text', 'blur', 'smudge', 'dotted', 'crop', 'resize', 'straightLine'];
         const controlIds = ['uploadImage', 'uploadGif', 'emojiPicker', 'savePNG', 'saveJPG', 'clear', 'undo', 'redo'];
         const colorPicker = document.getElementById('colorPicker');
         const sizeSlider = document.getElementById('sizeSlider');
@@ -2865,8 +2953,8 @@ class Whiteboard {
                 if (!info) {
                     info = document.createElement('div');
                     info.id = infoId;
-                    info.style = 'color:#e302f7;font-weight:600;text-align:center;margin:10px 0;';
-                    info.innerText = 'On-Chain Mode: Pixelated board enabled for gas-efficient SVG NFTs. Click pixels to color them!';
+                    info.className = 'onchain-info-bar';
+                    info.innerHTML = '<span style="font-size:1.1em;vertical-align:middle;margin-right:0.4em;"><i class="fas fa-bolt"></i></span>On-Chain Mode: Pixelated board enabled for gas-efficient SVG NFTs. Click pixels to color them!';
                     document.querySelector('.app-header').appendChild(info);
                 }
             } else {
