@@ -221,7 +221,7 @@ class Whiteboard {
         this.redrawCanvas();
         
         // Disable all tools except pixelated mode functionality
-        const toolIds = ['pencil', 'brush', 'spray', 'eraser', 'text', 'blur', 'smudge', 'dotted', 'crop', 'resize'];
+        const toolIds = ['pencil', 'brush', 'spray', 'eraser', 'text', 'blur', 'smudge', 'dotted', 'crop', 'resize', 'straightLine'];
         const controlIds = ['uploadImage', 'uploadGif', 'emojiPicker', 'savePNG', 'saveJPG', 'clear', 'undo', 'redo'];
         
         toolIds.forEach(id => {
@@ -267,7 +267,7 @@ class Whiteboard {
         
         if (isOnChainMode) {
             // In onchain mode: only enable pencil, clear, undo, redo
-            const toolIds = ['pencil', 'brush', 'spray', 'eraser', 'text', 'blur', 'smudge', 'dotted', 'crop', 'resize'];
+            const toolIds = ['pencil', 'brush', 'spray', 'eraser', 'text', 'blur', 'smudge', 'dotted', 'crop', 'resize', 'straightLine'];
             const controlIds = ['uploadImage', 'uploadGif', 'emojiPicker', 'savePNG', 'saveJPG', 'clear', 'undo', 'redo'];
             
             toolIds.forEach(id => {
@@ -301,7 +301,7 @@ class Whiteboard {
             if (monanimalBtn) monanimalBtn.disabled = true;
         } else {
             // Not in onchain mode: re-enable all tools/controls
-            const toolIds = ['pencil', 'brush', 'spray', 'eraser', 'text', 'blur', 'smudge', 'dotted', 'crop', 'resize'];
+            const toolIds = ['pencil', 'brush', 'spray', 'eraser', 'text', 'blur', 'smudge', 'dotted', 'crop', 'resize', 'straightLine'];
             const controlIds = ['uploadImage', 'uploadGif', 'emojiPicker', 'savePNG', 'saveJPG', 'clear', 'undo', 'redo'];
             
             toolIds.forEach(id => {
@@ -2555,7 +2555,7 @@ class Whiteboard {
         let sizeMessage = `SVG Size: ${svgInfo.size} characters (${svgInfo.percentage}% of limit)\n${svgInfo.recommendation}`;
         
         if (svgInfo.isTooLarge) {
-            showNotification(`SVG too large! ${sizeMessage}`, 'error');
+            showNotification('Pixelated uploads are disabled for on-chain minting due to high SVG cost. Please use fewer pixels or switch to normal mode.', 'error');
             return;
         }
 
@@ -3086,6 +3086,120 @@ window.addEventListener('load', () => {
     window.whiteboard = new Whiteboard();
     window.whiteboard.setupOnChainModeToggle();
     window.whiteboard.setupModeSwitchButton();
+
+    // --- Pixelate Image Button Logic ---
+    const pixelateBtn = document.getElementById('pixelateImageBtn');
+    function updatePixelateBtnState() {
+        if (!pixelateBtn) return;
+        const isPixel = window.whiteboard.isPixelatedMode;
+        // Check On-Chain Mode
+        const toggleBtn = document.getElementById('onChainModeToggle');
+        const isOnChain = toggleBtn && toggleBtn.getAttribute('aria-pressed') === 'true';
+        pixelateBtn.disabled = !isPixel || isOnChain;
+        pixelateBtn.style.opacity = (!isPixel || isOnChain) ? '0.5' : '1';
+        if (isOnChain) {
+            pixelateBtn.title = 'Pixelate is disabled in On-Chain Mode to avoid high minting costs for large SVGs.';
+        } else {
+            pixelateBtn.title = 'Pixelate Image (Upload to Pixel Board)';
+        }
+    }
+    updatePixelateBtnState();
+    // Patch enable/disable pixelated mode to update button
+    const origEnablePixel = window.whiteboard.enablePixelatedMode.bind(window.whiteboard);
+    window.whiteboard.enablePixelatedMode = (...args) => { origEnablePixel(...args); updatePixelateBtnState(); };
+    const origDisablePixel = window.whiteboard.disablePixelatedMode.bind(window.whiteboard);
+    window.whiteboard.disablePixelatedMode = (...args) => { origDisablePixel(...args); updatePixelateBtnState(); };
+
+    if (pixelateBtn) {
+        pixelateBtn.addEventListener('click', () => {
+            if (!window.whiteboard.isPixelatedMode) return;
+            // Show modal for size selection
+            const modal = document.getElementById('pixelateSizeModal');
+            if (!modal) return;
+            modal.style.display = 'flex';
+            // Modal close logic
+            const closeModal = () => { modal.style.display = 'none'; };
+            document.getElementById('closePixelateSizeModal').onclick = closeModal;
+            // Only attach handlers once
+            if (!modal._handlersAttached) {
+                document.getElementById('choosePixelate32').onclick = () => { closeModal(); pixelateImageAtSize(32); };
+                document.getElementById('choosePixelate48').onclick = () => { closeModal(); pixelateImageAtSize(48); };
+                modal._handlersAttached = true;
+            }
+        });
+    }
+
+    function pixelateImageAtSize(size) {
+        // Create file input
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(ev) {
+                const img = new window.Image();
+                img.onload = function() {
+                    // Draw to hidden canvas at chosen size, centered with aspect ratio preserved
+                    const canvas = document.createElement('canvas');
+                    canvas.width = size;
+                    canvas.height = size;
+                    const ctx = canvas.getContext('2d');
+                    // Fill with white
+                    ctx.fillStyle = '#fff';
+                    ctx.fillRect(0, 0, size, size);
+                    // Calculate aspect fit
+                    const scale = Math.min(size / img.width, size / img.height);
+                    const drawW = img.width * scale;
+                    const drawH = img.height * scale;
+                    const offsetX = (size - drawW) / 2;
+                    const offsetY = (size - drawH) / 2;
+                    ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
+                    // Get pixel data
+                    const imgData = ctx.getImageData(0, 0, size, size).data;
+                    // Center the image in the pixelGrid
+                    const gridRows = window.whiteboard.pixelGrid.length;
+                    const gridCols = window.whiteboard.pixelGrid[0].length;
+                    const startRow = Math.floor((gridRows - size) / 2);
+                    const startCol = Math.floor((gridCols - size) / 2);
+                    for (let y = 0; y < size; y++) {
+                        for (let x = 0; x < size; x++) {
+                            const idx = (y * size + x) * 4;
+                            const r = imgData[idx];
+                            const g = imgData[idx+1];
+                            const b = imgData[idx+2];
+                            const a = imgData[idx+3];
+                            // Convert to hex, ignore alpha for now
+                            const hex = a === 0 ? '#FFFFFF' : '#' + [r,g,b].map(v=>v.toString(16).padStart(2,'0')).join('');
+                            const gridY = startRow + y;
+                            const gridX = startCol + x;
+                            if (window.whiteboard.pixelGrid[gridY] && window.whiteboard.pixelGrid[gridY][gridX] !== undefined) {
+                                window.whiteboard.pixelGrid[gridY][gridX] = hex;
+                            }
+                        }
+                    }
+                    window.whiteboard.drawPixelGrid();
+                    window.whiteboard.saveState();
+                };
+                img.src = ev.target.result;
+            };
+            reader.readAsDataURL(file);
+        };
+        input.click();
+    }
+
+    // First-time user popup logic
+    if (!localStorage.getItem('hasVisitedMagicalBoard')) {
+        const modal = document.getElementById('firstTimeModal');
+        if (modal) {
+            modal.style.display = 'flex';
+            document.getElementById('closeFirstTimeModal').onclick = () => {
+                modal.style.display = 'none';
+                localStorage.setItem('hasVisitedMagicalBoard', 'true');
+            };
+        }
+    }
 });
 
 // Notification function

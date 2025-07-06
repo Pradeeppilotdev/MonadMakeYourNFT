@@ -724,6 +724,10 @@
                         <i class="fas fa-image"></i>
                         <p>IMG</p>
                     </button>
+                    <button id="pixelateImageBtn" class="control-btn" title="Pixelate Image (Upload to Pixel Board)">
+                        <i class="fas fa-camera-retro"></i>
+                        <p>Pixelate</p>
+                    </button>
                     <!-- <button id="uploadGif" class="control-btn" title="Upload GIF">
                         <i class="fas fa-film"></i>
                     </button> -->
@@ -802,6 +806,12 @@
                             <li><strong>Emoji Picker:</strong> Add emojis and symbols</li>
                             <li><strong>MonAnimals:</strong> Build characters using pre-made parts</li>
                         </ul>
+                        <div style="margin-top:0.7em; text-align:left;">
+                          <div style="display:inline-block; background:rgba(227,2,247,0.08); color:#b57df6; border:1.5px solid #fff; border-radius:10px; padding:0.6em 1.2em; font-size:0.7em; font-weight:600;">
+                            <i class='fas fa-triangle-exclamation' style='margin-right:0.5em;'></i>
+                            Note: Pixelated mode uploads are <b>disabled for on-chain minting</b> due to high gas costs.
+                          </div>
+                        </div>
                     </div>
 
                     <div class="instruction-card">
@@ -857,6 +867,7 @@
                     </div>
                 </div>
             </div>
+           
         </section>
 
         <!-- Minted NFTs Section -->
@@ -935,6 +946,29 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    <!-- Pixelate Size Modal -->
+    <div id="pixelateSizeModal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(20,0,40,0.55); z-index:9999; align-items:center; justify-content:center;">
+      <div style="background:rgba(30,0,50,0.97); border-radius:18px; box-shadow:0 4px 32px #7b2ff2aa; padding:2.2em 2.5em; min-width:260px; display:flex; flex-direction:column; align-items:center; gap:1.2em; position:relative;">
+        <button id="closePixelateSizeModal" style="position:absolute; top:10px; right:14px; background:none; border:none; color:#f357a8; font-size:1.3em; cursor:pointer;"><i class="fas fa-times"></i></button>
+        <div style="font-size:1.1em; color:#fff; font-weight:600; margin-bottom:0.5em; text-align:center;">Choose pixel grid size</div>
+        <div style="display:flex; gap:1.2em;">
+          <button id="choosePixelate32" style="background:linear-gradient(90deg,#7b2ff2,#f357a8); color:#fff; border:none; border-radius:10px; font-size:1.1em; font-weight:600; padding:0.7em 1.5em; cursor:pointer; box-shadow:0 2px 8px #7b2ff255;">32x32</button>
+          <button id="choosePixelate48" style="background:linear-gradient(90deg,#e302f7,#b90c9f); color:#fff; border:none; border-radius:10px; font-size:1.1em; font-weight:600; padding:0.7em 1.5em; cursor:pointer; box-shadow:0 2px 8px #e302f755;">48x48</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- First Time User Modal -->
+    <div id="firstTimeModal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(30,0,50,0.55); z-index:10000; align-items:center; justify-content:center;">
+      <div style="background:rgba(255,255,255,0.97); border-radius:18px; box-shadow:0 4px 32px #7b2ff2aa; padding:2.2em 2.5em; min-width:260px; max-width:90vw; display:flex; flex-direction:column; align-items:center; gap:1.2em; position:relative;">
+        <button id="closeFirstTimeModal" style="position:absolute; top:10px; right:14px; background:none; border:none; color:#e302f7; font-size:1.3em; cursor:pointer;"><i class="fas fa-times"></i></button>
+        <div style="font-size:1.3em; color:#7b2ff2; font-weight:700; margin-bottom:0.5em; text-align:center;">Hola frens!!</div>
+        <div style="font-size:1.08em; color:#222; text-align:center; max-width:420px;">
+          I would recommend you to read the <b>instructions below the whiteboard</b> to know how these tools and elements work... some may be tricky ngl.<br><br>Have a nice mint! :)
+        </div>
+      </div>
     </div>
 
     <script src="config.js"></script>
