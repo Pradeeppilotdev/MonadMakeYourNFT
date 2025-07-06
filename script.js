@@ -2501,9 +2501,16 @@ class Whiteboard {
 
         // Always show confirmation before minting
         showConfirmation('Are you sure you want to mint this NFT?', async () => {
+            let ipfsNotification;
             try {
                 mintBtn.disabled = true;
                 mintBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Minting...';
+
+                // Show uploading notification
+                ipfsNotification = document.createElement('div');
+                ipfsNotification.className = 'notification info';
+                ipfsNotification.innerHTML = '<span class="icon"><i class="fa-solid fa-spinner fa-spin"></i></span><span>Uploading to IPFS(upto 20sec)…</span>';
+                document.getElementById('notificationContainer').appendChild(ipfsNotification);
 
                 // Get the canvas data
                 const canvas = this.canvas;
@@ -2513,8 +2520,11 @@ class Whiteboard {
                 const accounts = await window.web3.eth.getAccounts();
                 const account = accounts[0];
 
-                // Mint the NFT
+                // Mint the NFT (this uploads to IPFS)
                 const result = await this.nftMinter.mintNFT(imageData, account);
+
+                // Remove uploading notification
+                if (ipfsNotification && ipfsNotification.parentNode) ipfsNotification.parentNode.removeChild(ipfsNotification);
 
                 showNotification('NFT minted successfully! 🎉', 'success');
                 console.log('NFT minted:', result);
@@ -2523,6 +2533,7 @@ class Whiteboard {
                 await this.initializeNFTDisplay();
 
             } catch (error) {
+                if (ipfsNotification && ipfsNotification.parentNode) ipfsNotification.parentNode.removeChild(ipfsNotification);
                 console.error('Error minting NFT:', error);
                 showNotification('Failed to mint NFT: ' + error.message, 'error');
             } finally {
