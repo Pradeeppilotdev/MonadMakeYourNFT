@@ -213,6 +213,39 @@ class Whiteboard {
         this.drawPixelGrid();
         this.setupPixelColorPicker();
         this.redrawCanvas();
+        
+        // Disable all tools except pixelated mode functionality
+        const toolIds = ['pencil', 'brush', 'spray', 'eraser', 'text', 'blur', 'smudge', 'dotted', 'crop', 'resize'];
+        const controlIds = ['uploadImage', 'uploadGif', 'emojiPicker', 'savePNG', 'saveJPG', 'clear', 'undo', 'redo'];
+        
+        toolIds.forEach(id => {
+            const btn = document.getElementById(id);
+            if (btn) {
+                btn.classList.add('disabled');
+            }
+        });
+        controlIds.forEach(id => {
+            const btn = document.getElementById(id);
+            if (btn) {
+                // Allow clear/undo/redo
+                if (['clear', 'undo', 'redo'].includes(id)) btn.classList.remove('disabled');
+                else btn.classList.add('disabled');
+            }
+        });
+        
+        // Disable color picker and size slider (pixelated mode has its own)
+        const colorPicker = document.getElementById('colorPicker');
+        const sizeSlider = document.getElementById('sizeSlider');
+        if (colorPicker) colorPicker.disabled = true;
+        if (sizeSlider) sizeSlider.disabled = true;
+        
+        // Disable AI Generate Image button
+        const aiGenBtn = document.getElementById('aiGenerate');
+        if (aiGenBtn) aiGenBtn.disabled = true;
+        
+        // Disable Monanimal button
+        const monanimalBtn = document.getElementById('monanimalBuilder');
+        if (monanimalBtn) monanimalBtn.disabled = true;
     }
 
     // Switch back to whiteboard mode
@@ -221,6 +254,73 @@ class Whiteboard {
         this.canvas.classList.remove('pixelated-mode-active');
         this.removePixelColorPicker();
         this.redrawCanvas();
+        
+        // Check if we're in onchain mode to determine which buttons to enable
+        const toggleBtn = document.getElementById('onChainModeToggle');
+        const isOnChainMode = toggleBtn && toggleBtn.getAttribute('aria-pressed') === 'true';
+        
+        if (isOnChainMode) {
+            // In onchain mode: only enable pencil, clear, undo, redo
+            const toolIds = ['pencil', 'brush', 'spray', 'eraser', 'text', 'blur', 'smudge', 'dotted', 'crop', 'resize'];
+            const controlIds = ['uploadImage', 'uploadGif', 'emojiPicker', 'savePNG', 'saveJPG', 'clear', 'undo', 'redo'];
+            
+            toolIds.forEach(id => {
+                const btn = document.getElementById(id);
+                if (btn) {
+                    if (id === 'pencil') btn.classList.remove('disabled');
+                    else btn.classList.add('disabled');
+                }
+            });
+            controlIds.forEach(id => {
+                const btn = document.getElementById(id);
+                if (btn) {
+                    // Allow clear/undo/redo
+                    if (['clear', 'undo', 'redo'].includes(id)) btn.classList.remove('disabled');
+                    else btn.classList.add('disabled');
+                }
+            });
+            
+            // Keep color picker and size slider enabled for onchain mode
+            const colorPicker = document.getElementById('colorPicker');
+            const sizeSlider = document.getElementById('sizeSlider');
+            if (colorPicker) colorPicker.disabled = false;
+            if (sizeSlider) sizeSlider.disabled = false;
+            
+            // Keep AI Generate Image button disabled in onchain mode
+            const aiGenBtn = document.getElementById('aiGenerate');
+            if (aiGenBtn) aiGenBtn.disabled = true;
+            
+            // Keep Monanimal button disabled in onchain mode
+            const monanimalBtn = document.getElementById('monanimalBuilder');
+            if (monanimalBtn) monanimalBtn.disabled = true;
+        } else {
+            // Not in onchain mode: re-enable all tools/controls
+            const toolIds = ['pencil', 'brush', 'spray', 'eraser', 'text', 'blur', 'smudge', 'dotted', 'crop', 'resize'];
+            const controlIds = ['uploadImage', 'uploadGif', 'emojiPicker', 'savePNG', 'saveJPG', 'clear', 'undo', 'redo'];
+            
+            toolIds.forEach(id => {
+                const btn = document.getElementById(id);
+                if (btn) btn.classList.remove('disabled');
+            });
+            controlIds.forEach(id => {
+                const btn = document.getElementById(id);
+                if (btn) btn.classList.remove('disabled');
+            });
+            
+            // Re-enable color picker and size slider
+            const colorPicker = document.getElementById('colorPicker');
+            const sizeSlider = document.getElementById('sizeSlider');
+            if (colorPicker) colorPicker.disabled = false;
+            if (sizeSlider) sizeSlider.disabled = false;
+            
+            // Re-enable AI Generate Image button
+            const aiGenBtn = document.getElementById('aiGenerate');
+            if (aiGenBtn) aiGenBtn.disabled = false;
+            
+            // Re-enable Monanimal button
+            const monanimalBtn = document.getElementById('monanimalBuilder');
+            if (monanimalBtn) monanimalBtn.disabled = false;
+        }
     }
 
     // Draw the pixel grid
@@ -775,6 +875,12 @@ class Whiteboard {
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
             let clickedOnHandle = false;
+            
+            // Handle pixel click in pixelated mode
+            if (this.isPixelatedMode) {
+                this.handlePixelClick(x, y);
+                return;
+            }
             // 1. Handle logic for handles (rotate/delete)
             if (this.selectedElement) {
                 const bounds = this.getElementBounds(this.selectedElement);
@@ -2727,7 +2833,7 @@ class Whiteboard {
                 this.disablePixelatedMode();
             }
             
-            // Only pencil and color picker enabled
+            // Disable all tools except pixelated mode functionality
             toolIds.forEach(id => {
                 const btn = document.getElementById(id);
                 if (btn) {
@@ -2750,6 +2856,9 @@ class Whiteboard {
             // Disable AI Generate Image button in On-Chain Mode
             const aiGenBtn = document.getElementById('aiGenerate');
             if (aiGenBtn) aiGenBtn.disabled = !!enabled;
+            // Disable Monanimal button in On-Chain Mode
+            const monanimalBtn = document.getElementById('monanimalBuilder');
+            if (monanimalBtn) monanimalBtn.disabled = !!enabled;
             // Show info message
             let info = document.getElementById(infoId);
             if (enabled) {
@@ -2776,6 +2885,9 @@ class Whiteboard {
                 // Re-enable AI Generate Image button
                 const aiGenBtn = document.getElementById('aiGenerate');
                 if (aiGenBtn) aiGenBtn.disabled = false;
+                // Re-enable Monanimal button
+                const monanimalBtn = document.getElementById('monanimalBuilder');
+                if (monanimalBtn) monanimalBtn.disabled = false;
             }
         }
         
