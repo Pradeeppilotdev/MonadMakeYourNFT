@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,6 +13,7 @@
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <!-- Add Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
         .notification-container {
             position: fixed;
@@ -26,6 +28,7 @@
             flex-direction: column;
             align-items: center;
         }
+
         .notification {
             display: flex;
             align-items: center;
@@ -33,7 +36,7 @@
             background: linear-gradient(90deg, #7b2ff2 0%, #f357a8 100%);
             color: #fff;
             border-radius: 12px;
-            box-shadow: 0 4px 24px rgba(123,47,242,0.15);
+            box-shadow: 0 4px 24px rgba(123, 47, 242, 0.15);
             padding: 16px 28px;
             margin-bottom: 12px;
             font-size: 1.1rem;
@@ -42,21 +45,26 @@
             max-width: 100%;
             animation: fadeIn 0.3s;
         }
+
         .notification.success {
             background: linear-gradient(90deg, #e302f7 0%, #b90c9f 100%);
         }
+
         .notification.error {
             background: linear-gradient(90deg, #a00fe3 0%, #aa0ca5 100%);
         }
+
         .notification.warning {
             background: linear-gradient(90deg, #d30de1 0%, #ca64df 100%);
             color: #fbf9fb;
         }
+
         .notification .icon {
             font-size: 1.5em;
             display: flex;
             align-items: center;
         }
+
         .wallet-info-card {
             display: flex;
             align-items: center;
@@ -64,7 +72,7 @@
             background: linear-gradient(90deg, #7b2ff2 0%, #f357a8 100%);
             color: #fff;
             border-radius: 16px;
-            box-shadow: 0 2px 16px rgba(123,47,242,0.10);
+            box-shadow: 0 2px 16px rgba(123, 47, 242, 0.10);
             padding: 14px 28px;
             margin-top: 10px;
             font-size: 1.1rem;
@@ -74,19 +82,22 @@
             max-width: 100vw;
             transition: box-shadow 0.2s;
         }
+
         .wallet-info-card .wallet-address {
             font-family: 'Fira Mono', monospace;
-            background: rgba(255,255,255,0.12);
+            background: rgba(255, 255, 255, 0.12);
             padding: 4px 10px;
             border-radius: 8px;
             font-size: 1em;
         }
+
         .wallet-info-card .network-name {
-            background: rgba(255,255,255,0.12);
+            background: rgba(255, 255, 255, 0.12);
             padding: 4px 10px;
             border-radius: 8px;
             font-size: 1em;
         }
+
         .wallet-info-card .disconnect-btn {
             background: #fff;
             color: #7b2ff2;
@@ -98,19 +109,28 @@
             margin-left: 10px;
             transition: background 0.2s, color 0.2s;
         }
+
         .wallet-info-card .disconnect-btn:hover {
             background: #f357a8;
             color: #fff;
         }
+
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-20px); }
-            to { opacity: 1; transform: translateY(0); }
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         /* NFT Section Styles */
         .minted-nfts-section {
             padding: 2rem;
-            background: rgba(123,47,242,0.05);
+            background: rgba(123, 47, 242, 0.05);
             margin-top: 2rem;
             border-radius: 16px;
         }
@@ -133,7 +153,7 @@
         .nft-card {
             background: white;
             border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(123,47,242,0.1);
+            box-shadow: 0 4px 20px rgba(123, 47, 242, 0.1);
             overflow: hidden;
             transition: transform 0.2s, box-shadow 0.2s;
             cursor: pointer;
@@ -141,14 +161,14 @@
 
         .nft-card:hover {
             transform: translateY(-5px);
-            box-shadow: 0 8px 30px rgba(123,47,242,0.2);
+            box-shadow: 0 8px 30px rgba(123, 47, 242, 0.2);
         }
 
         .nft-image {
             width: 100%;
             height: 250px;
             object-fit: cover;
-            border-bottom: 2px solid rgba(123,47,242,0.1);
+            border-bottom: 2px solid rgba(123, 47, 242, 0.1);
         }
 
         .nft-info {
@@ -199,9 +219,9 @@
         .text-input {
             width: 100%;
             padding: 8px;
-            border: 1px solid rgba(123,47,242,0.3);
+            border: 1px solid rgba(123, 47, 242, 0.3);
             border-radius: 8px;
-            background: rgba(123,47,242,0.1);
+            background: rgba(123, 47, 242, 0.1);
             color: #fff;
             font-size: 14px;
             transition: all 0.2s ease;
@@ -210,19 +230,19 @@
         .text-input:focus {
             outline: none;
             border-color: #7b2ff2;
-            box-shadow: 0 0 0 2px rgba(123,47,242,0.2);
+            box-shadow: 0 0 0 2px rgba(123, 47, 242, 0.2);
         }
 
         .text-input::placeholder {
-            color: rgba(255,255,255,0.5);
+            color: rgba(255, 255, 255, 0.5);
         }
 
         .font-select {
             width: 100%;
             padding: 8px;
-            border: 1px solid rgba(123,47,242,0.3);
+            border: 1px solid rgba(123, 47, 242, 0.3);
             border-radius: 8px;
-            background: rgba(123,47,242,0.1);
+            background: rgba(123, 47, 242, 0.1);
             color: #fff;
             font-size: 14px;
             cursor: pointer;
@@ -239,7 +259,7 @@
         .font-select:focus {
             outline: none;
             border-color: #7b2ff2;
-            box-shadow: 0 0 0 2px rgba(123,47,242,0.2);
+            box-shadow: 0 0 0 2px rgba(123, 47, 242, 0.2);
         }
 
         .font-select option {
@@ -250,7 +270,7 @@
 
         .font-select:hover {
             border-color: #7b2ff2;
-            background-color: rgba(123,47,242,0.2);
+            background-color: rgba(123, 47, 242, 0.2);
         }
 
         /* Make the dropdown menu more visible */
@@ -274,7 +294,7 @@
         }
 
         #fontSizeValue {
-            background: rgba(123,47,242,0.2);
+            background: rgba(123, 47, 242, 0.2);
             padding: 2px 6px;
             border-radius: 4px;
             font-size: 12px;
@@ -299,8 +319,8 @@
         .ai-modal-content {
             background: linear-gradient(135deg, #1a1b26 0%, #2d2d3a 100%);
             border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(123,47,242,0.3);
-            border: 2px solid rgba(123,47,242,0.3);
+            box-shadow: 0 20px 60px rgba(123, 47, 242, 0.3);
+            border: 2px solid rgba(123, 47, 242, 0.3);
             max-width: 800px;
             width: 90%;
             max-height: 90vh;
@@ -313,6 +333,7 @@
                 opacity: 0;
                 transform: scale(0.9) translateY(-20px);
             }
+
             to {
                 opacity: 1;
                 transform: scale(1) translateY(0);
@@ -324,7 +345,7 @@
             justify-content: space-between;
             align-items: center;
             padding: 20px 30px;
-            border-bottom: 2px solid rgba(123,47,242,0.2);
+            border-bottom: 2px solid rgba(123, 47, 242, 0.2);
             background: linear-gradient(90deg, #7b2ff2 0%, #f357a8 100%);
             color: white;
             border-radius: 18px 18px 0 0;
@@ -340,7 +361,7 @@
         }
 
         .close-btn {
-            background: rgba(255,255,255,0.2);
+            background: rgba(255, 255, 255, 0.2);
             border: none;
             color: white;
             border-radius: 50%;
@@ -355,7 +376,7 @@
         }
 
         .close-btn:hover {
-            background: rgba(255,255,255,0.3);
+            background: rgba(255, 255, 255, 0.3);
             transform: scale(1.1);
         }
 
@@ -378,9 +399,9 @@
         .ai-input-section textarea {
             width: 100%;
             padding: 15px;
-            border: 2px solid rgba(123,47,242,0.3);
+            border: 2px solid rgba(123, 47, 242, 0.3);
             border-radius: 12px;
-            background: rgba(123,47,242,0.1);
+            background: rgba(123, 47, 242, 0.1);
             color: #fff;
             font-size: 1rem;
             resize: vertical;
@@ -391,11 +412,11 @@
         .ai-input-section textarea:focus {
             outline: none;
             border-color: #7b2ff2;
-            box-shadow: 0 0 0 3px rgba(123,47,242,0.2);
+            box-shadow: 0 0 0 3px rgba(123, 47, 242, 0.2);
         }
 
         .ai-input-section textarea::placeholder {
-            color: rgba(255,255,255,0.5);
+            color: rgba(255, 255, 255, 0.5);
         }
 
         .ai-options {
@@ -419,9 +440,9 @@
 
         .ai-option-group select {
             padding: 10px;
-            border: 2px solid rgba(123,47,242,0.3);
+            border: 2px solid rgba(123, 47, 242, 0.3);
             border-radius: 8px;
-            background: rgba(123,47,242,0.1);
+            background: rgba(123, 47, 242, 0.1);
             color: #fff;
             font-size: 0.9rem;
             cursor: pointer;
@@ -431,7 +452,7 @@
         .ai-option-group select:focus {
             outline: none;
             border-color: #7b2ff2;
-            box-shadow: 0 0 0 2px rgba(123,47,242,0.2);
+            box-shadow: 0 0 0 2px rgba(123, 47, 242, 0.2);
         }
 
         .ai-option-group select option {
@@ -459,7 +480,7 @@
 
         .generate-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(123,47,242,0.4);
+            box-shadow: 0 8px 25px rgba(123, 47, 242, 0.4);
         }
 
         .generate-btn:disabled {
@@ -469,7 +490,7 @@
         }
 
         .ai-results-section {
-            border-top: 2px solid rgba(123,47,242,0.2);
+            border-top: 2px solid rgba(123, 47, 242, 0.2);
             padding-top: 20px;
         }
 
@@ -487,8 +508,8 @@
         }
 
         .ai-result-item {
-            background: rgba(123,47,242,0.1);
-            border: 2px solid rgba(123,47,242,0.3);
+            background: rgba(123, 47, 242, 0.1);
+            border: 2px solid rgba(123, 47, 242, 0.3);
             border-radius: 12px;
             overflow: hidden;
             transition: all 0.2s;
@@ -497,7 +518,7 @@
 
         .ai-result-item:hover {
             transform: translateY(-5px);
-            box-shadow: 0 10px 30px rgba(123,47,242,0.3);
+            box-shadow: 0 10px 30px rgba(123, 47, 242, 0.3);
             border-color: #7b2ff2;
         }
 
@@ -530,9 +551,9 @@
         }
 
         .ai-result-item .download-btn {
-            background: rgba(255,255,255,0.1);
+            background: rgba(255, 255, 255, 0.1);
             color: #fff;
-            border: 1px solid rgba(255,255,255,0.3);
+            border: 1px solid rgba(255, 255, 255, 0.3);
         }
 
         .ai-result-item .use-image-btn:hover {
@@ -540,7 +561,7 @@
         }
 
         .ai-result-item .download-btn:hover {
-            background: rgba(255,255,255,0.2);
+            background: rgba(255, 255, 255, 0.2);
         }
 
         .ai-loading {
@@ -579,16 +600,19 @@
             transform: none;
         }
 
-        .tool.disabled, .control-btn.disabled {
+        .tool.disabled,
+        .control-btn.disabled {
             opacity: 0.4;
             pointer-events: none;
             filter: grayscale(1);
         }
+
         .onchain-toggle-label input[type="checkbox"] {
             accent-color: #e302f7;
         }
     </style>
 </head>
+
 <body>
     <div class="notification-container" id="notificationContainer"></div>
     <div class="app-container">
@@ -612,7 +636,8 @@
                 <div id="walletInfo" class="wallet-info-card" style="display: none;">
                     <span class="wallet-address" id="walletAddress"></span>
                     <span class="network-name" id="networkName"></span>
-                    <button class="disconnect-btn" id="disconnectWallet" title="Disconnect Wallet"><i class="fas fa-sign-out-alt"></i> Disconnect</button>
+                    <button class="disconnect-btn" id="disconnectWallet" title="Disconnect Wallet"><i
+                            class="fas fa-sign-out-alt"></i> Disconnect</button>
                 </div>
             </div>
         </header>
@@ -620,8 +645,8 @@
         <!-- Main content area -->
         <main class="main-content">
             <!-- Tools sidebar -->
-            <div class="tools-sidebar" style="width: 120px;">
-                <div class="tool-group">
+            <div class="tools-sidebar w-auto md:flex md:flex-col md:items-center lg:flex lg:flex-col lg:items-center">
+                <div class="tool-group  md:flex md:flex-row lg:flex lg:flex-col">
                     <button id="pencil" class="tool active" title="Pencil">
                         <i class="fas fa-pencil-alt"></i>
                         <p>Pencil</p>
@@ -647,29 +672,32 @@
                         <p>Text</p>
                     </button>
                 </div>
-                <div class="tool-group">
-                    <button id="blur" class="tool" title="Blur">
-                        <i class="fas fa-blur"></i>
-                        <p>Blur</p>
-                    </button>
-                    <button id="smudge" class="tool" title="Smudge">
-                        <i class="fas fa-hand-paper"></i>
-                        <p>Smudge</p>
-                    </button>
-                    <button id="dotted" class="tool" title="Dotted">
-                        <i class="fas fa-circle"></i>
-                        <p>Dots</p>
-                    </button>
-                </div>
-                <div class="tool-group">
-                    <button id="crop" class="tool" title="Crop">
-                        <i class="fas fa-crop"></i>
-                        <p>Crop</p>
-                    </button>
-                    <button id="resize" class="tool" title="Resize">
-                        <i class="fas fa-expand-arrows-alt"></i>
-                        <p>Resize</p>
-                    </button>
+                <div class="md:flex md:flex-row lg:flex lg:flex-col">
+                    <div class="tool-group md:flex md:flex-row lg:flex lg:flex-col">
+                        <button id="blur" class="tool" title="Blur">
+                            <i class="fas fa-blur"></i>
+                            <p>Blur</p>
+                        </button>
+                        <button id="smudge" class="tool" title="Smudge">
+                            <i class="fas fa-hand-paper"></i>
+                            <p>Smudge</p>
+                        </button>
+                        <button id="dotted" class="tool" title="Dotted">
+                            <i class="fas fa-circle"></i>
+                            <p>Dots</p>
+                        </button>
+                    </div>
+                    <div class="tool-group md:flex md:flex-row md:ml-4 lg:flex lg:flex-col lg:mt-6">
+                        <button id="crop" class="tool" title="Crop">
+                            <i class="fas fa-crop"></i>
+                            <p>Crop</p>
+                        </button>
+                        <button id="resize" class="tool" title="Resize">
+                            <i class="fas fa-expand-arrows-alt"></i>
+                            <p>Resize</p>
+                        </button>
+                    </div>
+
                 </div>
             </div>
             <!-- Text tool popover (hidden by default) -->
@@ -694,7 +722,7 @@
             </div>
             <!-- Canvas area -->
             <div class="canvas-container" style="flex: 2;">
-                <canvas id="whiteboard"></canvas>
+                <canvas id="whiteboard" height="400"></canvas>
                 <div class="canvas-overlay">
                     <button id="mintNFT" class="mint-btn" disabled title="Mint as NFT">
                         <i class="fas fa-magic"> Mint as NFT</i>
@@ -705,21 +733,24 @@
                 </div>
             </div>
             <!-- Controls sidebar -->
-            <div class="controls-sidebar" style="width: 120px;">
-                <div class="control-group">
-                    <button id="modeSwitchBtn" class="control-btn" title="Switch Board Mode">
-                        Switch to Pixelated Board
-                    </button>
-                </div>
-                <div class="control-group">
-                    <div class="color-picker-container">
-                        <input type="color" id="colorPicker" value="#000000" title="Color Picker">
+            <div class="controls-sidebar w-auto md:flex md:flex-col lg:flex lg:flex-col">
+                <div class="flex flex-row space-x-6 lg:flex lg:flex-col space-y-4 md:items-center">
+                    <div class="control-group">
+                        <button id="modeSwitchBtn" class="control-btn" title="Switch Board Mode">
+                            Switch to Pixelated Board
+                        </button>
                     </div>
-                    <div class="size-slider-container">
-                        <input type="range" id="sizeSlider" min="1" max="50" value="5" title="Brush Size">
+                    <div class="control-group">
+                        <div class="color-picker-container">
+                            <input type="color" id="colorPicker" value="#000000" title="Color Picker">
+                        </div>
+                        <div class="size-slider-container">
+                            <input type="range" id="sizeSlider" min="1" max="50" value="5" title="Brush Size">
+                        </div>
                     </div>
                 </div>
-                <div class="control-group">
+                <div
+                    class="control-group md:flex md:flex-row md:justify-center md:space-x-6 lg:flex lg:flex-col lg:items-center">
                     <button id="uploadImage" class="control-btn" title="Upload Image">
                         <i class="fas fa-image"></i>
                         <p>IMG</p>
@@ -744,7 +775,7 @@
                         <p>MonAnimals</p>
                     </button>
                 </div>
-                <div class="control-group">
+                <div class="control-group md:flex md:flex-col lg:flex lg:flex-col">
                     <button id="savePNG" class="control-btn" title="Save as PNG">
                         <i class="fas fa-download"></i>
                         <p>PNG</p>
@@ -775,7 +806,7 @@
                     <i class="fas fa-graduation-cap"></i>
                     How to Use the Tools
                 </h2>
-                
+
                 <div class="instructions-grid">
                     <div class="instruction-card">
                         <div class="instruction-icon">
@@ -807,10 +838,12 @@
                             <li><strong>MonAnimals:</strong> Build characters using pre-made parts</li>
                         </ul>
                         <div style="margin-top:0.7em; text-align:left;">
-                          <div style="display:inline-block; background:rgba(227,2,247,0.08); color:#b57df6; border:1.5px solid #fff; border-radius:10px; padding:0.6em 1.2em; font-size:0.7em; font-weight:600;">
-                            <i class='fas fa-triangle-exclamation' style='margin-right:0.5em;'></i>
-                            Note: Pixelated mode uploads are <b>disabled for on-chain minting</b> due to high gas costs.
-                          </div>
+                            <div
+                                style="display:inline-block; background:rgba(227,2,247,0.08); color:#b57df6; border:1.5px solid #fff; border-radius:10px; padding:0.6em 1.2em; font-size:0.7em; font-weight:600;">
+                                <i class='fas fa-triangle-exclamation' style='margin-right:0.5em;'></i>
+                                Note: Pixelated mode uploads are <b>disabled for on-chain minting</b> due to high gas
+                                costs.
+                            </div>
                         </div>
                     </div>
 
@@ -867,7 +900,7 @@
                     </div>
                 </div>
             </div>
-           
+
         </section>
 
         <!-- Minted NFTs Section -->
@@ -896,8 +929,10 @@
                 <div class="ai-modal-body">
                     <div class="ai-input-section">
                         <label for="aiPrompt">Describe the image you want to generate:</label>
-                        <textarea id="aiPrompt" placeholder="Enter a detailed description of the image you want to create..." rows="4"></textarea>
-                        
+                        <textarea id="aiPrompt"
+                            placeholder="Enter a detailed description of the image you want to create..."
+                            rows="4"></textarea>
+
                         <div class="ai-options">
                             <div class="ai-option-group">
                                 <label for="aiModel">Model:</label>
@@ -909,7 +944,7 @@
                                     <option value="stable-diffusion-xl-beta-v2-2-2">SDXL Beta 2.2.2</option>
                                 </select>
                             </div>
-                            
+
                             <div class="ai-option-group">
                                 <label for="aiSize">Size:</label>
                                 <select id="aiSize">
@@ -919,7 +954,7 @@
                                     <option value="512x512">512x512 (Small Square)</option>
                                 </select>
                             </div>
-                            
+
                             <div class="ai-option-group">
                                 <label for="aiSteps">Quality:</label>
                                 <select id="aiSteps">
@@ -929,12 +964,12 @@
                                 </select>
                             </div>
                         </div>
-                        
+
                         <button id="generateImage" class="generate-btn">
                             <i class="fas fa-magic"></i> Generate Image
                         </button>
                     </div>
-                    
+
                     <div class="ai-results-section" style="display: none;">
                         <h3>Generated Images</h3>
                         <div id="aiResults" class="ai-results-grid"></div>
@@ -949,26 +984,39 @@
     </div>
 
     <!-- Pixelate Size Modal -->
-    <div id="pixelateSizeModal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(20,0,40,0.55); z-index:9999; align-items:center; justify-content:center;">
-      <div style="background:rgba(30,0,50,0.97); border-radius:18px; box-shadow:0 4px 32px #7b2ff2aa; padding:2.2em 2.5em; min-width:260px; display:flex; flex-direction:column; align-items:center; gap:1.2em; position:relative;">
-        <button id="closePixelateSizeModal" style="position:absolute; top:10px; right:14px; background:none; border:none; color:#f357a8; font-size:1.3em; cursor:pointer;"><i class="fas fa-times"></i></button>
-        <div style="font-size:1.1em; color:#fff; font-weight:600; margin-bottom:0.5em; text-align:center;">Choose pixel grid size</div>
-        <div style="display:flex; gap:1.2em;">
-          <button id="choosePixelate32" style="background:linear-gradient(90deg,#7b2ff2,#f357a8); color:#fff; border:none; border-radius:10px; font-size:1.1em; font-weight:600; padding:0.7em 1.5em; cursor:pointer; box-shadow:0 2px 8px #7b2ff255;">32x32</button>
-          <button id="choosePixelate48" style="background:linear-gradient(90deg,#e302f7,#b90c9f); color:#fff; border:none; border-radius:10px; font-size:1.1em; font-weight:600; padding:0.7em 1.5em; cursor:pointer; box-shadow:0 2px 8px #e302f755;">48x48</button>
+    <div id="pixelateSizeModal"
+        style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(20,0,40,0.55); z-index:9999; align-items:center; justify-content:center;">
+        <div
+            style="background:rgba(30,0,50,0.97); border-radius:18px; box-shadow:0 4px 32px #7b2ff2aa; padding:2.2em 2.5em; min-width:260px; display:flex; flex-direction:column; align-items:center; gap:1.2em; position:relative;">
+            <button id="closePixelateSizeModal"
+                style="position:absolute; top:10px; right:14px; background:none; border:none; color:#f357a8; font-size:1.3em; cursor:pointer;"><i
+                    class="fas fa-times"></i></button>
+            <div style="font-size:1.1em; color:#fff; font-weight:600; margin-bottom:0.5em; text-align:center;">Choose
+                pixel grid size</div>
+            <div style="display:flex; gap:1.2em;">
+                <button id="choosePixelate32"
+                    style="background:linear-gradient(90deg,#7b2ff2,#f357a8); color:#fff; border:none; border-radius:10px; font-size:1.1em; font-weight:600; padding:0.7em 1.5em; cursor:pointer; box-shadow:0 2px 8px #7b2ff255;">32x32</button>
+                <button id="choosePixelate48"
+                    style="background:linear-gradient(90deg,#e302f7,#b90c9f); color:#fff; border:none; border-radius:10px; font-size:1.1em; font-weight:600; padding:0.7em 1.5em; cursor:pointer; box-shadow:0 2px 8px #e302f755;">48x48</button>
+            </div>
         </div>
-      </div>
     </div>
 
     <!-- First Time User Modal -->
-    <div id="firstTimeModal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(30,0,50,0.55); z-index:10000; align-items:center; justify-content:center;">
-      <div style="background:rgba(255,255,255,0.97); border-radius:18px; box-shadow:0 4px 32px #7b2ff2aa; padding:2.2em 2.5em; min-width:260px; max-width:90vw; display:flex; flex-direction:column; align-items:center; gap:1.2em; position:relative;">
-        <button id="closeFirstTimeModal" style="position:absolute; top:10px; right:14px; background:none; border:none; color:#e302f7; font-size:1.3em; cursor:pointer;"><i class="fas fa-times"></i></button>
-        <div style="font-size:1.3em; color:#7b2ff2; font-weight:700; margin-bottom:0.5em; text-align:center;">Hola frens!!</div>
-        <div style="font-size:1.08em; color:#222; text-align:center; max-width:420px;">
-          I would recommend you to read the <b>instructions below the whiteboard</b> to know how these tools and elements work... some may be tricky ngl.<br><br>Have a nice mint! :)
+    <div id="firstTimeModal"
+        style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(30,0,50,0.55); z-index:10000; align-items:center; justify-content:center;">
+        <div
+            style="background:rgba(255,255,255,0.97); border-radius:18px; box-shadow:0 4px 32px #7b2ff2aa; padding:2.2em 2.5em; min-width:260px; max-width:90vw; display:flex; flex-direction:column; align-items:center; gap:1.2em; position:relative;">
+            <button id="closeFirstTimeModal"
+                style="position:absolute; top:10px; right:14px; background:none; border:none; color:#e302f7; font-size:1.3em; cursor:pointer;"><i
+                    class="fas fa-times"></i></button>
+            <div style="font-size:1.3em; color:#7b2ff2; font-weight:700; margin-bottom:0.5em; text-align:center;">Hola
+                frens!!</div>
+            <div style="font-size:1.08em; color:#222; text-align:center; max-width:420px;">
+                I would recommend you to read the <b>instructions below the whiteboard</b> to know how these tools and
+                elements work... some may be tricky ngl.<br><br>Have a nice mint! :)
+            </div>
         </div>
-      </div>
     </div>
 
     <script src="config.js"></script>
@@ -1087,19 +1135,19 @@
                         const contractAddress = '0xC71d614c27A3B01890412d252138C5A1bFE69791';
                         // Connect whiteboard to NFT minter
                         connectToNFTMinter(whiteboard, contractAddress, window.web3);
-                        
+
                         // Initialize on-chain minter if contract address is configured
                         const onChainContractAddress = window.CONFIG?.MONAD?.ONCHAIN_CONTRACT_ADDRESS;
                         if (onChainContractAddress) {
                             window.onChainMinter = new OnChainMinter();
                             window.onChainMinter.initialize(window.web3, onChainContractAddress);
                             console.log('On-chain minter initialized');
-                            
+
                             // Enable on-chain mint button
                             const onChainMintBtn = document.getElementById('mintOnChainNFT');
                             if (onChainMintBtn) onChainMintBtn.disabled = false;
                         }
-                        
+
                         showNotification('Wallet connected to Monad Testnet!', 'success');
                     } catch (error) {
                         console.error('Error initializing Web3:', error);
@@ -1142,4 +1190,5 @@
         window.addEventListener('load', initWeb3);
     </script>
 </body>
-</html> 
+
+</html>
